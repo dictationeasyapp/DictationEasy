@@ -1,6 +1,5 @@
 import SwiftUI
 import Vision
-
 #if os(iOS)
 import UIKit
 #endif
@@ -19,23 +18,35 @@ class OCRManager: ObservableObject {
     private let supportedLanguages = ["en-US", "zh-Hant"]
 
     func processImage(_ image: UIImage) async throws {
+        // Reset state on the main thread
         isProcessing = true
         error = nil
+        extractedText = ""
 
-        guard let cgImage = image.cgImage else {
-            error = "Failed to process image 無法處理圖片"
-            isProcessing = false
+        // Resize the image to improve OCR performance (max 1000x1000)
+        let resizedImage = resizeImage(image, toMaxDimension: 1000) ?? image
+
+        guard let cgImage = resizedImage.cgImage else {
+            Task { @MainActor in
+                self.error = "Failed to process image 無法處理圖片"
+                self.isProcessing = false
+            }
             throw OCRError.invalidImage
         }
 
         let requestHandler = VNImageRequestHandler(cgImage: cgImage)
+
         let request = VNRecognizeTextRequest { [weak self] request, error in
             guard let self = self else { return }
 
             if let error = error {
                 Task { @MainActor in
-                    self.error = error.localizedDescription
+                    self.error = "OCR failed: \(error.localizedDescription) 文字識別失敗"
                     self.isProcessing = false
+                    self.extractedText = ""
+                    #if DEBUG
+                    print("OCRManager: Error during OCR - \(error.localizedDescription)")
+                    #endif
                 }
                 return
             }
@@ -44,6 +55,10 @@ class OCRManager: ObservableObject {
                 Task { @MainActor in
                     self.error = "No text found in image 圖片中未找到文字"
                     self.isProcessing = false
+                    self.extractedText = "No text detected. 沒有檢測到文字。"
+                    #if DEBUG
+                    print("OCRManager: No text observations found")
+                    #endif
                 }
                 return
             }
@@ -53,20 +68,32 @@ class OCRManager: ObservableObject {
             }.joined(separator: "\n")
 
             Task { @MainActor in
-                self.extractedText = self.cleanText(recognizedText)
+                let cleanedText = self.cleanText(recognizedText)
+                self.extractedText = cleanedText.isEmpty ? "No text detected. 沒有檢測到文字。" : cleanedText
                 self.isProcessing = false
+                #if DEBUG
+                print("OCRManager: Successfully extracted text - \(self.extractedText)")
+                #endif
             }
         }
 
+        // Configure the request for better accuracy
         request.recognitionLanguages = supportedLanguages
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
+        request.minimumTextHeight = 0.01 // Adjust for small text detection
 
         do {
             try requestHandler.perform([request])
         } catch {
-            self.error = error.localizedDescription
-            self.isProcessing = false
+            Task { @MainActor in
+                self.error = "Failed to perform OCR: \(error.localizedDescription) 無法執行文字識別"
+                self.isProcessing = false
+                self.extractedText = ""
+                #if DEBUG
+                print("OCRManager: Failed to perform request - \(error.localizedDescription)")
+                #endif
+            }
             throw error
         }
     }
@@ -78,6 +105,7 @@ class OCRManager: ObservableObject {
 
         var cleanedText = text
 
+        // Special handling for Chinese text
         if !matches.isEmpty {
             cleanedText = text.components(separatedBy: .whitespacesAndNewlines)
                 .filter { component in
@@ -88,9 +116,36 @@ class OCRManager: ObservableObject {
                 .joined(separator: " ")
         }
 
+        // Split by sentence-ending punctuation and clean up
         return cleanedText.components(separatedBy: CharacterSet(charactersIn: ".!?。！？"))
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: ".\n")
+    }
+
+    // Helper method to resize the image for better OCR performance
+    private func resizeImage(_ image: UIImage, toMaxDimension maxDimension: CGFloat) -> UIImage? {
+        let size = image.size
+        let aspectRatio = size.width / size.height
+        var newSize: CGSize
+
+        if size.width > size.height {
+            // Landscape image
+            newSize = CGSize(width: maxDimension, height: maxDimension / aspectRatio)
+        } else {
+            // Portrait image
+            newSize = CGSize(width: maxDimension * aspectRatio, height: maxDimension)
+        }
+
+        // Only resize if the image is larger than the max dimension
+        guard size.width > maxDimension || size.height > maxDimension else {
+            return image
+        }
+
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 0.0)
+        image.draw(in: CGRect(origin: .zero, size: newSize))
+        let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return resizedImage
     }
 }

@@ -18,7 +18,6 @@ struct ScanTabView: View {
 
     @State private var selectedItem: PhotosPickerItem?
     @State private var selectedImage: UIImage?
-    @State private var isProcessing = false
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var showPermissionAlert = false
@@ -87,10 +86,6 @@ struct ScanTabView: View {
                             .cornerRadius(10)
                     }
 
-                    if isProcessing {
-                        ProgressView("Processing... 處理中")
-                    }
-
                     if selectedImage != nil {
                         HStack(spacing: 20) {
                             Button(action: {
@@ -139,7 +134,6 @@ struct ScanTabView: View {
                                         settings.extractedText = entry.text
                                         isEditingPastDictation = true
                                         onNavigateToText(true)
-
                                         #if DEBUG
                                         print("ScanTabView - Selected entry for editing: \(entry.id)")
                                         print("ScanTabView - Set editingDictationId: \(String(describing: settings.editingDictationId))")
@@ -153,7 +147,6 @@ struct ScanTabView: View {
                                             Text(entry.date, style: .date)
                                                 .font(.subheadline)
                                                 .foregroundColor(.primary)
-
                                             let sentences = entry.text.splitIntoSentences()
                                             let preview = sentences.isEmpty ? String(entry.text.prefix(50)) : sentences[0]
                                             Text(preview.count > 50 ? String(preview.prefix(50)) + "..." : preview)
@@ -261,7 +254,6 @@ struct ScanTabView: View {
     }
 
     // MARK: - Subviews
-
     private var bannerAdSection: some View {
         Group {
             if isFreeUser {
@@ -329,7 +321,6 @@ struct ScanTabView: View {
 
     private func processImage() {
         guard let image = selectedImage else { return }
-        isProcessing = true
         Task {
             do {
                 try await ocrManager.processImage(image)
@@ -344,9 +335,12 @@ struct ScanTabView: View {
                 errorMessage = error.localizedDescription
                 showError = true
             }
-            isProcessing = false
+            // Reset image selection after processing
+            selectedItem = nil
+            selectedImage = nil
         }
     }
+
     #else
     var body: some View {
         NavigationView {
