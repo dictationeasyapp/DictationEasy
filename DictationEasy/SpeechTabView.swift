@@ -6,8 +6,8 @@ struct SpeechTabView: View {
     @EnvironmentObject var playbackManager: PlaybackManager
     @EnvironmentObject var subscriptionManager: SubscriptionManager
     
-    @State private var showUpgradePrompt = false // For upgrade prompt
-    @State private var showSubscriptionView = false // For presenting SubscriptionView
+    @State private var showUpgradePrompt = false
+    @State private var showSubscriptionView = false
     
     var isFreeUser: Bool {
         return !subscriptionManager.isPremium
@@ -43,11 +43,17 @@ struct SpeechTabView: View {
             }
             .onAppear {
                 playbackManager.setSentences(settings.extractedText)
+                #if DEBUG
+                print("SpeechTabView.onAppear: extractedText = '\(settings.extractedText)', sentences = \(playbackManager.sentences)")
+                #endif
             }
             .onChange(of: settings.extractedText) { _ in
                 playbackManager.stopPlayback()
                 ttsManager.stopSpeaking()
                 playbackManager.setSentences(settings.extractedText)
+                #if DEBUG
+                print("SpeechTabView.onChange(extractedText): New text = '\(settings.extractedText)'")
+                #endif
             }
             .sheet(isPresented: $showSubscriptionView) {
                 SubscriptionView()
@@ -60,6 +66,14 @@ struct SpeechTabView: View {
                 Button("Cancel 取消", role: .cancel) { }
             } message: {
                 Text("Unlock this feature and more with a Premium subscription! 通過高級訂閱解鎖此功能等更多功能！")
+            }
+            .alert("Speech Error 語音錯誤", isPresented: Binding(
+                get: { ttsManager.error != nil },
+                set: { if !$0 { ttsManager.error = nil } }
+            )) {
+                Button("OK 確定", role: .cancel) { }
+            } message: {
+                Text(ttsManager.error ?? "Unknown error 未知錯誤")
             }
         }
     }
@@ -75,7 +89,7 @@ struct SpeechTabView: View {
                 .onChange(of: settings.includePunctuation) { newValue in
                     if newValue && !subscriptionManager.isPremium {
                         showUpgradePrompt = true
-                        settings.includePunctuation = false // Revert the change
+                        settings.includePunctuation = false
                     }
                 }
                 .padding(.horizontal)
@@ -85,7 +99,6 @@ struct SpeechTabView: View {
     private var textDisplaySection: some View {
         Group {
             if settings.showText {
-                // Random Order Button (moved above ScrollView)
                 if settings.playbackMode != .wholePassage {
                     Button(action: {
                         if subscriptionManager.isPremium {
@@ -187,41 +200,70 @@ struct SpeechTabView: View {
     }
     
     private var languagePickerSection: some View {
-        Picker("Language 語言", selection: $settings.audioLanguage) {
-            ForEach(AudioLanguage.allCases, id: \.self) { language in
-                Text(language.rawValue).tag(language)
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("Language 語言", selection: $settings.audioLanguage) {
+                ForEach(AudioLanguage.allCases, id: \.self) { language in
+                    Text(language.rawValue).tag(language)
+                }
+            }
+            .pickerStyle(.menu)
+            .padding(.horizontal)
+            
+            // New: Warning for Mandarin and Cantonese
+            if settings.audioLanguage == .mandarin || settings.audioLanguage == .cantonese {
+                Text("Check Settings > Accessibility > Spoken Content > Voices to ensure the correct Chinese variant is selected. 請檢查設置 > 輔助功能 > 語音內容 > 語音，確保選擇正確的中文變體。")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .padding(.horizontal)
             }
         }
-        .pickerStyle(.menu)
-        .padding(.horizontal)
     }
     
     private var playbackControlsSection: some View {
         HStack(spacing: 10) {
             // Play/Stop Button
             Button(action: {
+                #if DEBUG
+                print("SpeechTabView: Play button tapped, mode = \(settings.playbackMode.rawValue), isPlaying = \(playbackManager.isPlaying), text = '\(settings.extractedText)'")
+                #endif
+                
                 if playbackManager.isPlaying {
                     playbackManager.stopPlayback()
                     ttsManager.stopSpeaking()
                 } else {
                     switch settings.playbackMode {
                     case .wholePassage:
+                        guard !playbackManager.sentences.isEmpty else {
+                            ttsManager.error = "No sentences to play 無句子可播放"
+                            #if DEBUG
+                            print("SpeechTabView: Error - No sentences for whole passage")
+                            #endif
+                            return
+                        }
                         playbackManager.isPlaying = true
+                        let text = settings.processTextForSpeech(playbackManager.sentences.joined(separator: " "))
                         ttsManager.speak(
-                            text: settings.processTextForSpeech(playbackManager.sentences.joined(separator: " ")),
+                            text: text,
                             language: settings.audioLanguage,
                             rate: settings.playbackSpeed
                         )
+                        
                     case .sentenceBySentence:
-                        playbackManager.currentSentenceIndex = 0
-                        if let sentence = playbackManager.getCurrentSentence() {
-                            playbackManager.isPlaying = true
-                            ttsManager.speak(
-                                text: settings.processTextForSpeech(sentence),
-                                language: settings.audioLanguage,
-                                rate: settings.playbackSpeed
-                            )
+                        guard let sentence = playbackManager.getCurrentSentence() else {
+                            ttsManager.error = "No sentence available 無可用句子"
+                            #if DEBUG
+                            print("SpeechTabView: Error - No current sentence")
+                            #endif
+                            return
                         }
+                        playbackManager.isPlaying = true
+                        ttsManager.speak(
+                            text: settings.processTextForSpeech(sentence),
+                            language: settings.audioLanguage,
+                            rate: settings.playbackSpeed
+                        )
+                        
                     case .teacherMode:
                         if subscriptionManager.isPremium {
                             playbackManager.currentSentenceIndex = 0
@@ -258,11 +300,15 @@ struct SpeechTabView: View {
                 Button(action: {
                     ttsManager.stopSpeaking()
                     playbackManager.isPlaying = true
+                    let text = settings.processTextForSpeech(playbackManager.sentences.joined(separator: " "))
                     ttsManager.speak(
-                        text: settings.processTextForSpeech(playbackManager.sentences.joined(separator: " ")),
+                        text: text,
                         language: settings.audioLanguage,
                         rate: settings.playbackSpeed
                     )
+                    #if DEBUG
+                    print("SpeechTabView: Restart whole passage")
+                    #endif
                 }) {
                     Label("Restart 重新開始", systemImage: "arrow.clockwise")
                         .font(.headline)
@@ -284,6 +330,9 @@ struct SpeechTabView: View {
                     } else {
                         showUpgradePrompt = true
                     }
+                    #if DEBUG
+                    print("SpeechTabView: Restart teacher mode")
+                    #endif
                 }) {
                     Label("Restart 重新開始", systemImage: "arrow.clockwise")
                         .font(.headline)
@@ -306,6 +355,9 @@ struct SpeechTabView: View {
                             language: settings.audioLanguage,
                             rate: settings.playbackSpeed
                         )
+                        #if DEBUG
+                        print("SpeechTabView: Restart sentence by sentence")
+                        #endif
                     }
                 }) {
                     Image(systemName: "arrow.clockwise")
@@ -326,6 +378,9 @@ struct SpeechTabView: View {
                             language: settings.audioLanguage,
                             rate: settings.playbackSpeed
                         )
+                        #if DEBUG
+                        print("SpeechTabView: Previous sentence")
+                        #endif
                     }
                 }) {
                     Image(systemName: "backward.fill")
@@ -345,6 +400,9 @@ struct SpeechTabView: View {
                             language: settings.audioLanguage,
                             rate: settings.playbackSpeed
                         )
+                        #if DEBUG
+                        print("SpeechTabView: Next sentence")
+                        #endif
                     }
                 }) {
                     Image(systemName: "forward.fill")
@@ -367,13 +425,21 @@ struct SpeechTabView: View {
     }
     
     private var voiceAvailabilityWarningSection: some View {
-        Group {
-            if !settings.isSelectedVoiceAvailable() {
+        VStack(spacing: 8) {
+            // Existing: Voice availability warning
+            if !ttsManager.isVoiceAvailable(for: settings.audioLanguage) {
                 Text("Please download the \(settings.audioLanguage.rawValue) voice in Settings > Accessibility > Spoken Content > Voices 請在設置 > 輔助功能 > 語音內容 > 語音中下載\(settings.audioLanguage.rawValue)語音")
                     .foregroundColor(.red)
                     .multilineTextAlignment(.center)
-                    .padding()
+                    .padding(.horizontal)
             }
+            
+            // New: Silent mode reminder
+            Text("Ensure silent mode is off to hear playback. 請確保靜音模式已關閉以聽到播放。")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
         }
     }
     

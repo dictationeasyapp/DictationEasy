@@ -48,13 +48,13 @@ struct FeedbackSheet: View {
 
 struct SettingsTabView: View {
     @EnvironmentObject var settings: SettingsModel
-    @EnvironmentObject var subscriptionManager: SubscriptionManager // Add subscription manager
+    @EnvironmentObject var subscriptionManager: SubscriptionManager
     @State private var showDeleteConfirmation = false
-    @State private var showSettingsError = false // For file system errors
+    @State private var showSettingsError = false
     @State private var showFeedbackSheet = false
     @State private var showEmailError = false
     @State private var feedbackText = ""
-    @State private var showSubscriptionDetails = false // For presenting SubscriptionDetailsView
+    @State private var showSubscriptionDetails = false
     
     private var appVersion: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
@@ -156,6 +156,20 @@ struct SettingsTabView: View {
                 }
                 
                 Section {
+                    // New: FAQ Button
+                    NavigationLink {
+                        FAQView()
+                    } label: {
+                        Label("FAQ 常見問題", systemImage: "questionmark.circle")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(10)
+                    }
+                    .accessibilityLabel("FAQ Button 常見問題按鈕")
+                    
                     Text(appVersion)
                         .foregroundColor(.secondary)
                         .accessibilityLabel("App Version 應用版本")
@@ -175,14 +189,14 @@ struct SettingsTabView: View {
             }
             .alert("Settings Error 設置錯誤", isPresented: $showSettingsError) {
                 Button("OK 確定", role: .cancel) {
-                    settings.error = nil // Clear the error after dismissal
+                    settings.error = nil
                 }
             } message: {
                 Text(settings.error ?? "Unknown error 未知錯誤")
             }
             .alert("Email Error 電子郵件錯誤", isPresented: $showEmailError) {
                 Button("OK 確定", role: .cancel) {
-                    showEmailError = false // Reset the state after dismissal
+                    showEmailError = false
                 }
             } message: {
                 Text("Unable to send email. Please set up an email account in the Mail app. 無法發送電子郵件。請在郵件應用中設置電子郵件帳戶。")

@@ -26,162 +26,203 @@ struct ScanTabView: View {
     @State private var showCameraUnavailableAlert = false
     @State private var showCamera = false
     @State private var showSettingsError = false
-    @State private var showUpgradePrompt = false // Add this for upgrade prompt
-    @State private var showSubscriptionView = false // Add this for presenting SubscriptionView
+    @State private var showUpgradePrompt = false
+    @State private var showSubscriptionView = false
+    // New state for language selection
+    @State private var selectedScanLanguage: ScanLanguage = .english
 
     var isFreeUser: Bool {
         return !subscriptionManager.isPremium
     }
 
+    enum ScanLanguage: String, CaseIterable, Identifiable {
+        case english = "English英文"
+        case chinese = "Chinese中文"
+
+        var id: String { self.rawValue }
+
+        var visionLanguageCode: String {
+            switch self {
+            case .english:
+                return "en-US"
+            case .chinese:
+                return "zh-Hans" // Default to Simplified Chinese; Vision will also handle Traditional
+            }
+        }
+    }
+
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Photo Selection and Camera Buttons
-                    HStack(spacing: 20) {
-                        PhotosPicker(selection: $selectedItem, matching: .images) {
-                            Label("Select Image 選擇圖片", systemImage: "photo")
-                                .font(.title2)
-                                .padding()
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                        }
-                        .onTapGesture {
-                            checkPhotoLibraryPermission()
-                        }
-                        .onChange(of: selectedItem) { newItem in
-                            if let newItem = newItem {
-                                Task {
-                                    if let data = try? await newItem.loadTransferable(type: Data.self),
-                                       let image = UIImage(data: data) {
-                                        selectedImage = image
-                                    } else {
-                                        errorMessage = "Failed to load image 無法加載圖片"
-                                        showError = true
-                                    }
+            GeometryReader { geometry in
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Language Selection Picker
+                        VStack(alignment: .leading) {
+                            Text("Scan Language 掃描語言")
+                                .font(.headline)
+                                .padding(.horizontal)
+                            Picker("Language 語言", selection: $selectedScanLanguage) {
+                                ForEach(ScanLanguage.allCases) { language in
+                                    Text(language.rawValue).tag(language)
                                 }
-                            } else {
-                                selectedImage = nil
                             }
+                            .pickerStyle(.segmented)
+                            .padding(.horizontal)
                         }
 
-                        Button(action: {
-                            checkCameraPermission()
-                        }) {
-                            Label("Take Photo 拍照", systemImage: "camera")
-                                .font(.title2)
-                                .padding()
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                        }
-                    }
-
-                    if let image = selectedImage {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 200)
-                            .cornerRadius(10)
-                    }
-
-                    if selectedImage != nil {
+                        // Photo Selection and Camera Buttons
                         HStack(spacing: 20) {
-                            Button(action: {
-                                selectedItem = nil
-                                selectedImage = nil
-                            }) {
-                                Label("Cancel 取消", systemImage: "xmark")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.red)
-                                    .cornerRadius(10)
-                            }
-
-                            Button(action: {
-                                processImage()
-                            }) {
-                                Label("Extract Text 提取文字", systemImage: "text.viewfinder")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
+                            PhotosPicker(selection: $selectedItem, matching: .images) {
+                                Label("Select Image 選擇圖片", systemImage: "photo")
+                                    .font(.title2)
                                     .padding()
                                     .background(Color.blue)
+                                    .foregroundColor(.white)
                                     .cornerRadius(10)
                             }
-                        }
-                        .padding(.horizontal)
-                    }
-
-                    // Past Dictations Section
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Past Dictation 過去文章")
-                            .font(.headline)
-                            .padding(.horizontal)
-
-                        if settings.pastDictations.isEmpty {
-                            Text("No past dictations 沒有過去文章")
-                                .foregroundColor(.secondary)
-                                .padding()
-                        } else {
-                            ForEach(settings.pastDictations) { entry in
-                                Button(action: {
-                                    if subscriptionManager.isPremium {
-                                        settings.editingDictationId = entry.id
-                                        settings.extractedText = entry.text
-                                        isEditingPastDictation = true
-                                        onNavigateToText(true)
-                                        #if DEBUG
-                                        print("ScanTabView - Selected entry for editing: \(entry.id)")
-                                        print("ScanTabView - Set editingDictationId: \(String(describing: settings.editingDictationId))")
-                                        #endif
-                                    } else {
-                                        showUpgradePrompt = true
-                                    }
-                                }) {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 5) {
-                                            Text(entry.date, style: .date)
-                                                .font(.subheadline)
-                                                .foregroundColor(.primary)
-                                            let sentences = entry.text.splitIntoSentences()
-                                            let preview = sentences.isEmpty ? String(entry.text.prefix(50)) : sentences[0]
-                                            Text(preview.count > 50 ? String(preview.prefix(50)) + "..." : preview)
-                                                .font(.body)
-                                                .foregroundColor(.secondary)
-                                                .lineLimit(2)
+                            .onTapGesture {
+                                checkPhotoLibraryPermission()
+                            }
+                            .onChange(of: selectedItem) { newItem in
+                                if let newItem = newItem {
+                                    Task {
+                                        if let data = try? await newItem.loadTransferable(type: Data.self),
+                                           let image = UIImage(data: data) {
+                                            selectedImage = image
+                                        } else {
+                                            errorMessage = "Failed to load image 無法加載圖片"
+                                            showError = true
                                         }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .foregroundColor(.secondary)
                                     }
+                                } else {
+                                    selectedImage = nil
+                                }
+                            }
+
+                            Button(action: {
+                                checkCameraPermission()
+                            }) {
+                                Label("Take Photo 拍照", systemImage: "camera")
+                                    .font(.title2)
                                     .padding()
-                                    .background(Color(.systemBackground))
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
                                     .cornerRadius(10)
-                                    .shadow(radius: 1)
+                            }
+                        }
+
+                        if let image = selectedImage {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 200)
+                                .cornerRadius(10)
+                            Text("Scanning in \(selectedScanLanguage.rawValue) 以\(selectedScanLanguage.rawValue == "English" ? "英文" : "中文")掃描")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        if selectedImage != nil {
+                            HStack(spacing: 20) {
+                                Button(action: {
+                                    selectedItem = nil
+                                    selectedImage = nil
+                                }) {
+                                    Label("Cancel 取消", systemImage: "xmark")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .background(Color.red)
+                                        .cornerRadius(10)
                                 }
-                                .buttonStyle(PlainButtonStyle())
-                                .swipeActions(edge: .trailing) {
-                                    if subscriptionManager.isPremium {
-                                        Button(role: .destructive) {
-                                            settings.deletePastDictation(id: entry.id)
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
-                                    }
+
+                                Button(action: {
+                                    processImage()
+                                }) {
+                                    Label("Extract Text 提取文字", systemImage: "text.viewfinder")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .background(Color.blue)
+                                        .cornerRadius(10)
                                 }
                             }
                             .padding(.horizontal)
                         }
-                    }
 
-                    bannerAdSection
+                        // Past Dictations Section
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Past Dictation 過去文章")
+                                .font(.headline)
+                                .padding(.horizontal)
+
+                            if settings.pastDictations.isEmpty {
+                                Text("No past dictations 沒有過去文章")
+                                    .foregroundColor(.secondary)
+                                    .padding()
+                            } else {
+                                ForEach(settings.pastDictations) { entry in
+                                    Button(action: {
+                                        if subscriptionManager.isPremium {
+                                            settings.editingDictationId = entry.id
+                                            settings.extractedText = entry.text
+                                            isEditingPastDictation = true
+                                            onNavigateToText(true)
+                                            #if DEBUG
+                                            print("ScanTabView - Selected entry for editing: \(entry.id)")
+                                            print("ScanTabView - Set editingDictationId: \(String(describing: settings.editingDictationId))")
+                                            #endif
+                                        } else {
+                                            showUpgradePrompt = true
+                                        }
+                                    }) {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 5) {
+                                                Text(entry.date, style: .date)
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.primary)
+                                                let sentences = entry.text.splitIntoSentences()
+                                                let preview = sentences.isEmpty ? String(entry.text.prefix(50)) : sentences[0]
+                                                Text(preview.count > 50 ? String(preview.prefix(50)) + "..." : preview)
+                                                    .font(.body)
+                                                    .foregroundColor(.secondary)
+                                                    .lineLimit(2)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .padding()
+                                        .background(Color(.systemBackground))
+                                        .cornerRadius(10)
+                                        .shadow(radius: 1)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .swipeActions(edge: .trailing) {
+                                        if subscriptionManager.isPremium {
+                                            Button(role: .destructive) {
+                                                settings.deletePastDictation(id: entry.id)
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+
+                        Spacer() // Push banner ad to the bottom
+
+                        bannerAdSection
+                            .padding(.bottom, geometry.safeAreaInsets.bottom) // Account for tab bar
+                    }
+                    .frame(minHeight: geometry.size.height) // Ensure ScrollView fills the screen
                 }
+                .ignoresSafeArea(.all, edges: .bottom) // Prevent tab bar from clipping content
             }
-            .padding()
             .navigationTitle("Scan 掃描")
             .sheet(isPresented: $showCamera) {
                 ImagePicker(selectedImage: $selectedImage, sourceType: .camera)
@@ -249,6 +290,14 @@ struct ScanTabView: View {
                 if newError != nil {
                     showSettingsError = true
                 }
+            }
+            .onAppear {
+                // Reset transient state when re-entering the tab
+                selectedImage = nil
+                selectedItem = nil
+                #if DEBUG
+                print("ScanTabView - onAppear: Reset selectedImage and selectedItem")
+                #endif
             }
         }
     }
@@ -323,7 +372,8 @@ struct ScanTabView: View {
         guard let image = selectedImage else { return }
         Task {
             do {
-                try await ocrManager.processImage(image)
+                // Pass the selected scan language instead of audioLanguage
+                try await ocrManager.processImage(image, scanLanguage: selectedScanLanguage)
                 if let ocrError = ocrManager.error {
                     throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: ocrError])
                 }

@@ -14,19 +14,18 @@ class OCRManager: ObservableObject {
     @Published var extractedText: String = ""
     @Published var isProcessing: Bool = false
     @Published var error: String?
-    @Published var hasNewOCRResult: Bool = false // New flag to track new OCR results
+    @Published var hasNewOCRResult: Bool = false
 
-    private let supportedLanguages = ["en-US", "zh-Hant"]
-
-    func processImage(_ image: UIImage) async throws {
+    // Updated to accept ScanLanguage instead of AudioLanguage
+    func processImage(_ image: UIImage, scanLanguage: ScanTabView.ScanLanguage) async throws {
         // Reset state on the main thread
         isProcessing = true
         error = nil
         extractedText = ""
-        hasNewOCRResult = false // Reset flag
+        hasNewOCRResult = false
 
-        // Resize the image to improve OCR performance (max 1000x1000)
-        let resizedImage = resizeImage(image, toMaxDimension: 1000) ?? image
+        // Resize the image to improve OCR performance
+        let resizedImage = resizeImage(image, toMaxDimension: 1500) ?? image
 
         guard let cgImage = resizedImage.cgImage else {
             Task { @MainActor in
@@ -59,13 +58,23 @@ class OCRManager: ObservableObject {
                     self.error = "No text found in image 圖片中未找到文字"
                     self.isProcessing = false
                     self.extractedText = "No text detected. 沒有檢測到文字。"
-                    self.hasNewOCRResult = true // Flag new result
+                    self.hasNewOCRResult = true
                     #if DEBUG
                     print("OCRManager: No text observations found")
                     #endif
                 }
                 return
             }
+
+            // Log raw observations for debugging
+            #if DEBUG
+            print("OCRManager: Raw observations - \(observations.count) detected")
+            for (index, observation) in observations.enumerated() {
+                if let text = observation.topCandidates(1).first?.string {
+                    print("OCRManager: Observation \(index): \(text)")
+                }
+            }
+            #endif
 
             let recognizedText = observations.compactMap { observation in
                 observation.topCandidates(1).first?.string
@@ -75,18 +84,24 @@ class OCRManager: ObservableObject {
                 let cleanedText = self.cleanText(recognizedText)
                 self.extractedText = cleanedText.isEmpty ? "No text detected. 沒有檢測到文字。" : cleanedText
                 self.isProcessing = false
-                self.hasNewOCRResult = true // Flag new result
+                self.hasNewOCRResult = true
                 #if DEBUG
                 print("OCRManager: Successfully extracted text - \(self.extractedText)")
                 #endif
             }
         }
 
+        // Use only the selected language for OCR
+        let prioritizedLanguages = [scanLanguage.visionLanguageCode]
+        #if DEBUG
+        print("OCRManager: Prioritized languages - \(prioritizedLanguages)")
+        #endif
+
         // Configure the request for better accuracy
-        request.recognitionLanguages = supportedLanguages
+        request.recognitionLanguages = prioritizedLanguages
         request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
-        request.minimumTextHeight = 0.01 // Adjust for small text detection
+        request.usesLanguageCorrection = false
+        request.minimumTextHeight = 0.015
 
         do {
             try requestHandler.perform([request])
@@ -104,10 +119,9 @@ class OCRManager: ObservableObject {
         }
     }
 
-    // New method to allow TextTabView to update extractedText
     func updateExtractedText(_ text: String) {
         extractedText = text
-        hasNewOCRResult = false // Not an OCR result
+        hasNewOCRResult = false
         #if DEBUG
         print("OCRManager: Updated extractedText to '\(text)'")
         #endif
@@ -117,7 +131,6 @@ class OCRManager: ObservableObject {
         let chineseRegex = try! NSRegularExpression(pattern: "[\\u4e00-\\u9fff]+")
         let range = NSRange(text.startIndex..., in: text)
         let matches = chineseRegex.matches(in: text, range: range)
-
         var cleanedText = text
 
         // Special handling for Chinese text
@@ -144,14 +157,11 @@ class OCRManager: ObservableObject {
         var newSize: CGSize
 
         if size.width > size.height {
-            // Landscape image
             newSize = CGSize(width: maxDimension, height: maxDimension / aspectRatio)
         } else {
-            // Portrait image
             newSize = CGSize(width: maxDimension * aspectRatio, height: maxDimension)
         }
 
-        // Only resize if the image is larger than the max dimension
         guard size.width > maxDimension || size.height > maxDimension else {
             return image
         }
