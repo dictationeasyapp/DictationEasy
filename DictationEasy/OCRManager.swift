@@ -14,6 +14,7 @@ class OCRManager: ObservableObject {
     @Published var extractedText: String = ""
     @Published var isProcessing: Bool = false
     @Published var error: String?
+    @Published var hasNewOCRResult: Bool = false // New flag to track new OCR results
 
     private let supportedLanguages = ["en-US", "zh-Hant"]
 
@@ -22,6 +23,7 @@ class OCRManager: ObservableObject {
         isProcessing = true
         error = nil
         extractedText = ""
+        hasNewOCRResult = false // Reset flag
 
         // Resize the image to improve OCR performance (max 1000x1000)
         let resizedImage = resizeImage(image, toMaxDimension: 1000) ?? image
@@ -44,6 +46,7 @@ class OCRManager: ObservableObject {
                     self.error = "OCR failed: \(error.localizedDescription) 文字識別失敗"
                     self.isProcessing = false
                     self.extractedText = ""
+                    self.hasNewOCRResult = false
                     #if DEBUG
                     print("OCRManager: Error during OCR - \(error.localizedDescription)")
                     #endif
@@ -56,6 +59,7 @@ class OCRManager: ObservableObject {
                     self.error = "No text found in image 圖片中未找到文字"
                     self.isProcessing = false
                     self.extractedText = "No text detected. 沒有檢測到文字。"
+                    self.hasNewOCRResult = true // Flag new result
                     #if DEBUG
                     print("OCRManager: No text observations found")
                     #endif
@@ -71,6 +75,7 @@ class OCRManager: ObservableObject {
                 let cleanedText = self.cleanText(recognizedText)
                 self.extractedText = cleanedText.isEmpty ? "No text detected. 沒有檢測到文字。" : cleanedText
                 self.isProcessing = false
+                self.hasNewOCRResult = true // Flag new result
                 #if DEBUG
                 print("OCRManager: Successfully extracted text - \(self.extractedText)")
                 #endif
@@ -90,12 +95,22 @@ class OCRManager: ObservableObject {
                 self.error = "Failed to perform OCR: \(error.localizedDescription) 無法執行文字識別"
                 self.isProcessing = false
                 self.extractedText = ""
+                self.hasNewOCRResult = false
                 #if DEBUG
                 print("OCRManager: Failed to perform request - \(error.localizedDescription)")
                 #endif
             }
             throw error
         }
+    }
+
+    // New method to allow TextTabView to update extractedText
+    func updateExtractedText(_ text: String) {
+        extractedText = text
+        hasNewOCRResult = false // Not an OCR result
+        #if DEBUG
+        print("OCRManager: Updated extractedText to '\(text)'")
+        #endif
     }
 
     private func cleanText(_ text: String) -> String {
@@ -123,7 +138,6 @@ class OCRManager: ObservableObject {
             .joined(separator: ".\n")
     }
 
-    // Helper method to resize the image for better OCR performance
     private func resizeImage(_ image: UIImage, toMaxDimension maxDimension: CGFloat) -> UIImage? {
         let size = image.size
         let aspectRatio = size.width / size.height

@@ -2,7 +2,7 @@ import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #endif
-import Vision // Import Vision for OCR (if not already handled in OCRManager)
+import Vision
 
 struct TextTabView: View {
     @Binding var selectedTab: TabSelection
@@ -11,11 +11,11 @@ struct TextTabView: View {
     @EnvironmentObject var subscriptionManager: SubscriptionManager
     let isEditingPastDictation: Bool
     
-    @State private var showSettingsError = false // New state for file system errors
-    @State private var isLoading: Bool = false // New state for loading indicator
-    @State private var ocrError: String? // New state for OCR errors
+    @State private var showSettingsError = false
+    @State private var isLoading: Bool = false
+    @State private var ocrError: String?
+    @FocusState private var isTextEditorFocused: Bool
     
-    // Determine if the user is on the free tier (shows ads)
     var isFreeUser: Bool {
         return !subscriptionManager.isPremium
     }
@@ -27,8 +27,7 @@ struct TextTabView: View {
 
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                // Show loading indicator or text editor based on isLoading state
+            VStack(spacing: 0) {
                 if isLoading {
                     ProgressView("Extracting text... 正在提取文字...")
                         .progressViewStyle(CircularProgressViewStyle())
@@ -41,89 +40,103 @@ struct TextTabView: View {
                         .padding()
                         .background(Color(.systemGray6))
                         .cornerRadius(10)
-                        .padding()
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.gray, lineWidth: 1)
-                        )
+                        .padding(.horizontal)
+                        .focused($isTextEditorFocused)
+                        .toolbar {
+                            ToolbarItemGroup(placement: .keyboard) {
+                                Spacer()
+                                Button("Done 完成") {
+                                    isTextEditorFocused = false
+                                }
+                            }
+                        }
                         .placeholder(when: settings.extractedText.isEmpty) {
                             Text("Extracted text will appear here 提取的文字將顯示在此處")
-                                .foregroundColor(.gray) // Fixed syntax error: '..gray' to '.gray'
+                                .foregroundColor(.gray)
                                 .padding()
+                        }
+                        .onChange(of: settings.extractedText) { newText in
+                            // Sync ocrManager.extractedText when the user manually edits
+                            ocrManager.updateExtractedText(newText)
                         }
                 }
                 
-                HStack(spacing: 20) {
-                    #if canImport(UIKit)
-                    Button(action: {
-                        UIPasteboard.general.string = settings.extractedText
-                    }) {
-                        Label("Copy 複製", systemImage: "doc.on.doc")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .cornerRadius(10)
-                    }
-                    #else
-                    Button(action: {
-                        // Fallback for non-UIKit platforms (e.g., macOS)
-                    }) {
-                        Label("Copy 複製", systemImage: "doc.on.doc")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.gray)
-                            .cornerRadius(10)
-                    }
-                    .disabled(true)
-                    #endif
+                VStack(spacing: 10) {
+                    HStack(spacing: 20) {
+                        #if canImport(UIKit)
+                        Button(action: {
+                            UIPasteboard.general.string = settings.extractedText
+                            isTextEditorFocused = false
+                        }) {
+                            Label("Copy 複製", systemImage: "doc.on.doc")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.blue)
+                                .cornerRadius(10)
+                        }
+                        #else
+                        Button(action: {}) {
+                            Label("Copy 複製", systemImage: "doc.on.doc")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.gray)
+                                .cornerRadius(10)
+                        }
+                        .disabled(true)
+                        #endif
 
+                        Button(action: {
+                            settings.extractedText = ""
+                            ocrManager.updateExtractedText("") // Update ocrManager
+                            isTextEditorFocused = false
+                        }) {
+                            Label("Clear 清除", systemImage: "trash")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.red)
+                                .cornerRadius(10)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 10)
+                    
                     Button(action: {
-                        settings.extractedText = ""
-                        ocrManager.extractedText = ""
+                        if !settings.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            settings.savePastDictation(text: settings.extractedText)
+                            ocrManager.updateExtractedText(settings.extractedText) // Sync on confirm
+                        }
+                        settings.playbackMode = .sentenceBySentence
+                        selectedTab = .speech
+                        isTextEditorFocused = false
                     }) {
-                        Label("Clear 清除", systemImage: "trash")
+                        Label("Confirm 確認", systemImage: "checkmark")
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.red)
+                            .background(settings.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray : Color.blue)
                             .cornerRadius(10)
                     }
-                }
-                .padding(.horizontal)
-                
-                Button(action: {
-                    if !settings.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        settings.savePastDictation(text: settings.extractedText)
+                    .padding(.horizontal)
+                    .disabled(settings.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    
+                    if isFreeUser {
+                        BannerAdView()
+                            .frame(height: 50)
                     }
-                    settings.playbackMode = .sentenceBySentence
-                    selectedTab = .speech
-                }) {
-                    Label("Confirm 確認", systemImage: "checkmark")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(10)
                 }
-                .padding(.horizontal)
-                .disabled(settings.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                
-                // Add the banner ad here, conditionally shown for free users
-                if isFreeUser {
-                    BannerAdView()
-                        .frame(height: 50) // GADAdSizeBanner is 320x50
-                }
+                .background(Color(.systemBackground))
             }
             .navigationTitle("Text 文字")
             .alert("Settings Error 設置錯誤", isPresented: $showSettingsError) {
                 Button("OK 確定", role: .cancel) {
-                    settings.error = nil // Clear the error after dismissal
+                    settings.error = nil
                 }
             } message: {
                 Text(settings.error ?? "Unknown error 未知錯誤")
@@ -149,48 +162,67 @@ struct TextTabView: View {
                 }
             }
             .onAppear {
-                // If editing past dictation, don't overwrite the text
+                // Only sync with OCRManager if there's a new OCR result or we're editing a past dictation
                 if isEditingPastDictation {
                     if settings.editingDictationId == nil {
                         settings.extractedText = ocrManager.extractedText
+                        #if DEBUG
+                        print("TextTabView.onAppear - Synced with ocrManager (editing past dictation, no editingId)")
+                        #endif
                     }
-                } else {
-                    // If not editing, always sync with OCRManager
+                } else if ocrManager.hasNewOCRResult {
                     if ocrManager.isProcessing {
-                        // OCR is still processing, show loading indicator
                         isLoading = true
-                    } else if !ocrManager.extractedText.isEmpty {
-                        // OCR has completed, update the text immediately
+                        #if DEBUG
+                        print("TextTabView.onAppear - OCR is processing, showing loading")
+                        #endif
+                    } else {
                         settings.extractedText = ocrManager.extractedText
                         isLoading = false
-                    } else {
-                        // No text available yet, ensure the text is cleared
-                        settings.extractedText = ""
-                        isLoading = false
+                        ocrManager.hasNewOCRResult = false // Reset flag after syncing
+                        #if DEBUG
+                        print("TextTabView.onAppear - Synced with ocrManager (new OCR result): \(settings.extractedText)")
+                        #endif
                     }
                     settings.editingDictationId = nil
+                } else {
+                    // Preserve settings.extractedText unless there's a new OCR result
+                    ocrManager.updateExtractedText(settings.extractedText) // Ensure sync
+                    isLoading = false
+                    settings.editingDictationId = nil
+                    #if DEBUG
+                    print("TextTabView.onAppear - Preserved settings.extractedText: \(settings.extractedText)")
+                    #endif
                 }
-                
-                #if DEBUG
-                print("TextTabView.onAppear - editingDictationId: \(String(describing: settings.editingDictationId))")
-                print("TextTabView.onAppear - isEditingPastDictation: \(isEditingPastDictation)")
-                print("TextTabView.onAppear - isLoading: \(isLoading)")
-                #endif
             }
             .onChange(of: ocrManager.extractedText) { newText in
-                // When OCRManager updates its extractedText, sync it with settings and update UI
-                DispatchQueue.main.async {
-                    settings.extractedText = newText
-                    isLoading = false
+                // Only update if there's a new OCR result
+                if ocrManager.hasNewOCRResult {
+                    DispatchQueue.main.async {
+                        settings.extractedText = newText
+                        isLoading = false
+                        ocrManager.hasNewOCRResult = false
+                        #if DEBUG
+                        print("TextTabView.onChange(ocrManager.extractedText) - Updated settings.extractedText: \(newText)")
+                        #endif
+                    }
                 }
             }
             .onChange(of: ocrManager.isProcessing) { isProcessing in
-                // Update loading state based on OCRManager's processing status
                 DispatchQueue.main.async {
                     isLoading = isProcessing
+                    #if DEBUG
+                    print("TextTabView.onChange(ocrManager.isProcessing) - isLoading: \(isLoading)")
+                    #endif
+                }
+            }
+            .onChange(of: selectedTab) { newTab in
+                if newTab != .text {
+                    isTextEditorFocused = false
                 }
             }
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 }
 
