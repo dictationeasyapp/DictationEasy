@@ -48,11 +48,13 @@ struct FeedbackSheet: View {
 
 struct SettingsTabView: View {
     @EnvironmentObject var settings: SettingsModel
+    @EnvironmentObject var subscriptionManager: SubscriptionManager // Add subscription manager
     @State private var showDeleteConfirmation = false
     @State private var showSettingsError = false // For file system errors
     @State private var showFeedbackSheet = false
     @State private var showEmailError = false
     @State private var feedbackText = ""
+    @State private var showSubscriptionDetails = false // For presenting SubscriptionDetailsView
     
     private var appVersion: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
@@ -122,6 +124,23 @@ struct SettingsTabView: View {
                 }
                 
                 Section {
+                    Button(action: {
+                        showSubscriptionDetails = true
+                    }) {
+                        Label("Manage Subscription 管理訂閱", systemImage: "creditcard")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(10)
+                    }
+                    .accessibilityLabel("Manage Subscription Button 管理訂閱按鈕")
+                } header: {
+                    Text("Account 帳戶")
+                }
+                
+                Section {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Font Size 字體大小: \(Int(settings.fontSize))pt")
                         
@@ -174,6 +193,10 @@ struct SettingsTabView: View {
                     onSendFeedback: sendFeedback
                 )
             }
+            .sheet(isPresented: $showSubscriptionDetails) {
+                SubscriptionDetailsView()
+                    .environmentObject(subscriptionManager)
+            }
             .onChange(of: settings.error) { newError in
                 if newError != nil {
                     showSettingsError = true
@@ -186,4 +209,5 @@ struct SettingsTabView: View {
 #Preview {
     SettingsTabView()
         .environmentObject(SettingsModel())
+        .environmentObject(SubscriptionManager.shared)
 }
