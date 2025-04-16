@@ -7,11 +7,23 @@ struct BannerAdView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UIViewController {
         let viewController = UIViewController()
-        let bannerView = GADBannerView(adSize: GADAdSizeBanner) // 320x50 banner size
+        let bannerView = BannerView(adSize: AdSizeBanner) // 320x50 banner size
         bannerView.adUnitID = adUnitID
         bannerView.rootViewController = viewController
         bannerView.delegate = context.coordinator
-        bannerView.load(GADRequest())
+
+        // Configure the ad request based on ATT status
+        let request = Request()
+        if !AppDelegate.isTrackingAuthorized {
+            // Use non-personalized ads if tracking is not authorized
+            let extras = Extras()
+            extras.additionalParameters = ["npa": "1"] // Non-personalized ads
+            request.register(extras)
+            print("BannerAdView: Requesting non-personalized ads (npa=1)")
+        } else {
+            print("BannerAdView: Requesting personalized ads")
+        }
+        bannerView.load(request)
 
         // Add the banner view to the view controller's view
         viewController.view.addSubview(bannerView)
@@ -32,12 +44,12 @@ struct BannerAdView: UIViewControllerRepresentable {
         Coordinator()
     }
 
-    class Coordinator: NSObject, GADBannerViewDelegate {
-        func bannerViewDidReceiveAd(_ bannerView: GADBannerView) {
+    class Coordinator: NSObject, BannerViewDelegate {
+        func bannerViewDidReceiveAd(_ bannerView: BannerView) {
             print("BannerAdView: Banner ad received successfully")
         }
 
-        func bannerView(_ bannerView: GADBannerView, didFailToReceiveAdWithError error: Error) {
+        func bannerView(_ bannerView: BannerView, didFailToReceiveAdWithError error: Error) {
             print("BannerAdView: Failed to receive banner ad with error: \(error.localizedDescription)")
         }
     }

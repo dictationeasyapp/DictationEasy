@@ -88,6 +88,7 @@ struct SettingsTabView: View {
     var body: some View {
         NavigationView {
             List {
+                // 1. Delete All Past Dictations
                 Section {
                     Button(action: {
                         showDeleteConfirmation = true
@@ -106,23 +107,7 @@ struct SettingsTabView: View {
                     Text("Data Management 數據管理")
                 }
                 
-                Section {
-                    Button(action: {
-                        showFeedbackSheet = true
-                    }) {
-                        Label("Feedback 功能改善反映", systemImage: "envelope")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .cornerRadius(10)
-                    }
-                    .accessibilityLabel("Send Feedback Button 發送反饋按鈕")
-                } header: {
-                    Text("Feedback 反饋")
-                }
-                
+                // 2. Manage Subscription
                 Section {
                     Button(action: {
                         showSubscriptionDetails = true
@@ -140,6 +125,25 @@ struct SettingsTabView: View {
                     Text("Account 帳戶")
                 }
                 
+                // 3. Feedback
+                Section {
+                    Button(action: {
+                        showFeedbackSheet = true
+                    }) {
+                        Label("Feedback 功能改善反映", systemImage: "envelope")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(10)
+                    }
+                    .accessibilityLabel("Send Feedback Button 發送反饋按鈕")
+                } header: {
+                    Text("Feedback 反饋")
+                }
+                
+                // 4. Font Size
                 Section {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Font Size 字體大小: \(Int(settings.fontSize))pt")
@@ -155,8 +159,8 @@ struct SettingsTabView: View {
                     Text("Font Size 字體大小")
                 }
                 
+                // 5. About (FAQ and App Version)
                 Section {
-                    // New: FAQ Button
                     NavigationLink {
                         FAQView()
                     } label: {

@@ -1,2 +1,0 @@
-GoogleMobileAdsResources.bundle
-UserMessagingPlatformResources.bundle

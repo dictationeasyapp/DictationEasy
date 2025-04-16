@@ -12,6 +12,9 @@ class TTSManager: NSObject, ObservableObject, TTSManagerProtocol {
     override init() {
         super.init()
         synthesizer.delegate = self
+        #if DEBUG
+        print("TTSManager.init: Initialized")
+        #endif
     }
 
     func speak(text: String, language: AudioLanguage, rate: Double) {
@@ -23,39 +26,48 @@ class TTSManager: NSObject, ObservableObject, TTSManagerProtocol {
             return
         }
 
-        // Log available voices for debugging
-        let availableVoices = AVSpeechSynthesisVoice.speechVoices()
-        #if DEBUG
-        print("TTSManager.speak: Available voices: \(availableVoices.map { $0.language })")
-        #endif
-
-        // Try the requested language first
-        var selectedVoice = AVSpeechSynthesisVoice(language: language.voiceIdentifier)
-        
-        // Fallback to default voice if the selected one is unavailable
-        if selectedVoice == nil {
-            selectedVoice = AVSpeechSynthesisVoice(language: "en-US") // Fallback to English
-            error = "Voice for \(language.rawValue) not available, using default (en-US). 請下載\(language.rawValue)語音"
+        // Validate rate
+        let clampedRate = min(max(rate, 0.0), 1.0) // Ensure rate is between 0.0 and 1.0
+        if rate != clampedRate {
             #if DEBUG
-            print("TTSManager.speak: Warning - Voice for \(language.voiceIdentifier) not found, falling back to en-US")
+            print("TTSManager.speak: Warning - Rate \(rate) was out of bounds, clamped to \(clampedRate)")
             #endif
         }
 
-        guard let voice = selectedVoice else {
-            error = "No speech voices available. Please check Settings > Accessibility > Spoken Content > Voices 無可用語音，請檢查設置"
+        // Log available voices for debugging
+        let availableVoices = AVSpeechSynthesisVoice.speechVoices()
+        #if DEBUG
+        print("TTSManager.speak: Available voices: \(availableVoices.map { "\($0.language) (\($0.name))" })")
+        #endif
+
+        // Check if the requested language voice is available
+        let selectedVoice = AVSpeechSynthesisVoice(language: language.voiceIdentifier)
+        
+        if selectedVoice == nil {
+            // Voice not available, provide actionable error
+            error = "Voice for \(language.rawValue) not available. Please go to Settings > Accessibility > Spoken Content > Voices to download it. \(language.rawValue)語音不可用，請前往設置 > 輔助功能 > 語音內容 > 語音下載"
             #if DEBUG
-            print("TTSManager.speak: Error - No voices available")
+            print("TTSManager.speak: Error - Voice for \(language.voiceIdentifier) not found")
+            #endif
+            return
+        }
+
+        // Ensure at least one voice is available
+        guard !availableVoices.isEmpty else {
+            error = "No speech voices available. Please check Settings > Accessibility > Spoken Content > Voices to download a voice. 無可用語音，請檢查設置 > 輔助功能 > 語音內容 > 語音下載"
+            #if DEBUG
+            print("TTSManager.speak: Error - No voices available at all")
             #endif
             return
         }
 
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = voice
-        utterance.rate = Float(rate) * AVSpeechUtteranceDefaultSpeechRate
+        utterance.voice = selectedVoice
+        utterance.rate = Float(clampedRate) * AVSpeechUtteranceDefaultSpeechRate
         utterance.pitchMultiplier = 1.0
 
         #if DEBUG
-        print("TTSManager.speak: Speaking '\(text)' in \(language.rawValue) at rate \(rate)")
+        print("TTSManager.speak: Speaking '\(text)' in \(language.rawValue) (\(language.voiceIdentifier)) at rate \(clampedRate)")
         #endif
 
         synthesizer.speak(utterance)
@@ -79,16 +91,28 @@ class TTSManager: NSObject, ObservableObject, TTSManagerProtocol {
     }
 
     func continueSpeaking() {
-        synthesizer.continueSpeaking()
-        isPlaying = true
-        #if DEBUG
-        print("TTSManager.continueSpeaking: Continued")
-        #endif
+        let success = synthesizer.continueSpeaking()
+        if success {
+            isPlaying = true
+            #if DEBUG
+            print("TTSManager.continueSpeaking: Continued")
+            #endif
+        } else {
+            error = "Failed to continue speaking. No speech in progress. 無法繼續朗讀，沒有正在進行的語音"
+            isPlaying = false
+            #if DEBUG
+            print("TTSManager.continueSpeaking: Failed - No speech in progress")
+            #endif
+        }
     }
 
-    // New method to check voice availability
+    // Check voice availability
     func isVoiceAvailable(for language: AudioLanguage) -> Bool {
-        return AVSpeechSynthesisVoice(language: language.voiceIdentifier) != nil
+        let isAvailable = AVSpeechSynthesisVoice(language: language.voiceIdentifier) != nil
+        #if DEBUG
+        print("TTSManager.isVoiceAvailable: Language \(language.rawValue) (\(language.voiceIdentifier)) - Available: \(isAvailable)")
+        #endif
+        return isAvailable
     }
 }
 
@@ -137,5 +161,11 @@ extension TTSManager: AVSpeechSynthesizerDelegate {
             print("TTSManager.delegate: Speech canceled")
             #endif
         }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, willSpeakRangeOfSpeechString characterRange: NSRange, utterance: AVSpeechUtterance) {
+        #if DEBUG
+        print("TTSManager.delegate: Will speak range \(characterRange)")
+        #endif
     }
 }

@@ -1,15 +1,12 @@
 #!/bin/sh
-echo "PATH: $PATH"
 set -e
 set -u
 set -o pipefail
 
 function on_error {
-  echo "$(grealpath -m "${0}"):$1: error: Unexpected failure"
+  echo "$(realpath -q "${0}"):$1: error: Unexpected failure"
 }
 trap 'on_error $LINENO' ERR
-
-echo "UNLOCALIZED_RESOURCES_FOLDER_PATH: ${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
 
 if [ -z ${UNLOCALIZED_RESOURCES_FOLDER_PATH+x} ]; then
   # If UNLOCALIZED_RESOURCES_FOLDER_PATH is not set, then there's nowhere for us to copy
@@ -19,8 +16,7 @@ fi
 
 mkdir -p "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
 
-RESOURCES_TO_COPY=${TARGET_TEMP_DIR}/resources-to-copy-${TARGETNAME}.txt
-
+RESOURCES_TO_COPY=${PODS_ROOT}/resources-to-copy-${TARGETNAME}.txt
 > "$RESOURCES_TO_COPY"
 
 XCASSET_FILES=()
@@ -110,34 +106,10 @@ if [[ "$CONFIGURATION" == "Release" ]]; then
 fi
 
 mkdir -p "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
-# Read each resource from RESOURCES_TO_COPY and copy it using cp
-while IFS= read -r resource; do
-  if [ -n "$resource" ]; then
-    source_path="${PODS_ROOT}/../$resource"
-    destination_path="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
-    if [ -e "$source_path" ]; then
-      echo "Copying $source_path to $destination_path"
-      cp -R "$source_path" "$destination_path"
-    else
-      echo "Warning: Resource not found: $source_path"
-    fi
-  fi
-done < "$RESOURCES_TO_COPY"
+rsync -avr --copy-links --no-relative --exclude '*/.svn/*' --files-from="$RESOURCES_TO_COPY" / "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
 if [[ "${ACTION}" == "install" ]] && [[ "${SKIP_INSTALL}" == "NO" ]]; then
   mkdir -p "${INSTALL_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
-  # Read each resource from RESOURCES_TO_COPY and copy it using cp
-while IFS= read -r resource; do
-  if [ -n "$resource" ]; then
-    source_path="${PODS_ROOT}/../$resource"
-    destination_path="${INSTALL_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
-    if [ -e "$source_path" ]; then
-      echo "Copying $source_path to $destination_path"
-      cp -R "$source_path" "$destination_path"
-    else
-      echo "Warning: Resource not found: $source_path"
-    fi
-  fi
-done < "$RESOURCES_TO_COPY"
+  rsync -avr --copy-links --no-relative --exclude '*/.svn/*' --files-from="$RESOURCES_TO_COPY" / "${INSTALL_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
 fi
 rm -f "$RESOURCES_TO_COPY"
 

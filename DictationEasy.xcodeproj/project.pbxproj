@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		48EBB4F411E689DDF9081CE2 /* Pods_DictationEasy.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8E5C23613D2AF1DDB4F3AAD0 /* Pods_DictationEasy.framework */; };
+		871D07E22DAF5DC900E0F91F /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 871D07E12DAF5DC900E0F91F /* StoreKit.framework */; };
 		87F206AF2DA2BA1C005F1592 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 87F206AE2DA2BA1C005F1592 /* UIKit.framework */; };
 		87F206B12DA2BA2B005F1592 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 87F206B02DA2BA2B005F1592 /* SwiftUI.framework */; };
 		87F206B32DA2BA3C005F1592 /* Vision.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 87F206B22DA2BA3C005F1592 /* Vision.framework */; };
@@ -36,6 +37,7 @@
 
 /* Begin PBXFileReference section */
 		169B41E12BCC7C54311610CD /* Pods-DictationEasy.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-DictationEasy.release.xcconfig"; path = "Target Support Files/Pods-DictationEasy/Pods-DictationEasy.release.xcconfig"; sourceTree = "<group>"; };
+		871D07E12DAF5DC900E0F91F /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		87F206802DA2B933005F1592 /* DictationEasy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DictationEasy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		87F206902DA2B935005F1592 /* DictationEasyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DictationEasyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		87F2069A2DA2B935005F1592 /* DictationEasyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DictationEasyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -84,6 +86,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				871D07E22DAF5DC900E0F91F /* StoreKit.framework in Frameworks */,
 				87F206B72DA2BA5F005F1592 /* PhotosUI.framework in Frameworks */,
 				87F206B52DA2BA48005F1592 /* AVFoundation.framework in Frameworks */,
 				87F208D32DAD548F005F1592 /* RevenueCat in Frameworks */,
@@ -137,6 +140,7 @@
 		87F206AD2DA2BA1C005F1592 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				871D07E12DAF5DC900E0F91F /* StoreKit.framework */,
 				87F206B62DA2BA5F005F1592 /* PhotosUI.framework */,
 				87F206B42DA2BA48005F1592 /* AVFoundation.framework */,
 				87F206B22DA2BA3C005F1592 /* Vision.framework */,
@@ -168,6 +172,7 @@
 				87F2067D2DA2B933005F1592 /* Frameworks */,
 				87F2067E2DA2B933005F1592 /* Resources */,
 				61384A5030E9D95FA346423F /* [CP] Copy Pods Resources */,
+				2871E562F8876A21FE191A7A /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -315,6 +320,23 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		2871E562F8876A21FE191A7A /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-DictationEasy/Pods-DictationEasy-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-DictationEasy/Pods-DictationEasy-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-DictationEasy/Pods-DictationEasy-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		61384A5030E9D95FA346423F /* [CP] Copy Pods Resources */ = {
@@ -505,12 +527,14 @@
 				DEVELOPMENT_ASSET_PATHS = "\"DictationEasy/Preview Content\"";
 				DEVELOPMENT_TEAM = 4MRGG99854;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DictationEasy/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "自助默書易DictationEasy";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSCameraUsageDescription = "DictationEasy needs camera access to take photos and extract text. DictationEasy 需要相機訪問權限以拍攝照片並提取文字。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "DictationEasy needs photo library access to scan images for text extraction. DictationEasy 需要照片庫訪問權限以掃描圖片進行文字提取。";
+				INFOPLIST_KEY_NSUserTrackingUsageDescription = "We use tracking to deliver personalized ads to support free features in the app. 我們使用追踪來提供個性化廣告，以支持應用中的免費功能。";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -545,12 +569,14 @@
 				DEVELOPMENT_ASSET_PATHS = "\"DictationEasy/Preview Content\"";
 				DEVELOPMENT_TEAM = 4MRGG99854;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DictationEasy/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "自助默書易DictationEasy";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSCameraUsageDescription = "DictationEasy needs camera access to take photos and extract text. DictationEasy 需要相機訪問權限以拍攝照片並提取文字。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "DictationEasy needs photo library access to scan images for text extraction. DictationEasy 需要照片庫訪問權限以掃描圖片進行文字提取。";
+				INFOPLIST_KEY_NSUserTrackingUsageDescription = "We use tracking to deliver personalized ads to support free features in the app. 我們使用追踪來提供個性化廣告，以支持應用中的免費功能。";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
