@@ -9,13 +9,13 @@
 /* Begin PBXBuildFile section */
 		48EBB4F411E689DDF9081CE2 /* Pods_DictationEasy.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8E5C23613D2AF1DDB4F3AAD0 /* Pods_DictationEasy.framework */; };
 		871D07E22DAF5DC900E0F91F /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 871D07E12DAF5DC900E0F91F /* StoreKit.framework */; };
+		871D0B692DB0C67900E0F91F /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 871D0B682DB0C67900E0F91F /* RevenueCat */; };
+		871D0B6B2DB0C67E00E0F91F /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = 871D0B6A2DB0C67E00E0F91F /* RevenueCatUI */; };
 		87F206AF2DA2BA1C005F1592 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 87F206AE2DA2BA1C005F1592 /* UIKit.framework */; };
 		87F206B12DA2BA2B005F1592 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 87F206B02DA2BA2B005F1592 /* SwiftUI.framework */; };
 		87F206B32DA2BA3C005F1592 /* Vision.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 87F206B22DA2BA3C005F1592 /* Vision.framework */; };
 		87F206B52DA2BA48005F1592 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 87F206B42DA2BA48005F1592 /* AVFoundation.framework */; };
 		87F206B72DA2BA5F005F1592 /* PhotosUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 87F206B62DA2BA5F005F1592 /* PhotosUI.framework */; };
-		87F208D32DAD548F005F1592 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 87F208D22DAD548F005F1592 /* RevenueCat */; };
-		87F208D52DAD548F005F1592 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = 87F208D42DAD548F005F1592 /* RevenueCatUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -89,9 +89,9 @@
 				871D07E22DAF5DC900E0F91F /* StoreKit.framework in Frameworks */,
 				87F206B72DA2BA5F005F1592 /* PhotosUI.framework in Frameworks */,
 				87F206B52DA2BA48005F1592 /* AVFoundation.framework in Frameworks */,
-				87F208D32DAD548F005F1592 /* RevenueCat in Frameworks */,
 				87F206B32DA2BA3C005F1592 /* Vision.framework in Frameworks */,
-				87F208D52DAD548F005F1592 /* RevenueCatUI in Frameworks */,
+				871D0B692DB0C67900E0F91F /* RevenueCat in Frameworks */,
+				871D0B6B2DB0C67E00E0F91F /* RevenueCatUI in Frameworks */,
 				87F206B12DA2BA2B005F1592 /* SwiftUI.framework in Frameworks */,
 				87F206AF2DA2BA1C005F1592 /* UIKit.framework in Frameworks */,
 				48EBB4F411E689DDF9081CE2 /* Pods_DictationEasy.framework in Frameworks */,
@@ -172,7 +172,6 @@
 				87F2067D2DA2B933005F1592 /* Frameworks */,
 				87F2067E2DA2B933005F1592 /* Resources */,
 				61384A5030E9D95FA346423F /* [CP] Copy Pods Resources */,
-				2871E562F8876A21FE191A7A /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -320,23 +319,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		2871E562F8876A21FE191A7A /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-DictationEasy/Pods-DictationEasy-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-DictationEasy/Pods-DictationEasy-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-DictationEasy/Pods-DictationEasy-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		61384A5030E9D95FA346423F /* [CP] Copy Pods Resources */ = {
@@ -720,12 +702,12 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		87F208D22DAD548F005F1592 /* RevenueCat */ = {
+		871D0B682DB0C67900E0F91F /* RevenueCat */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 87F208D12DAD548F005F1592 /* XCRemoteSwiftPackageReference "purchases-ios" */;
 			productName = RevenueCat;
 		};
-		87F208D42DAD548F005F1592 /* RevenueCatUI */ = {
+		871D0B6A2DB0C67E00E0F91F /* RevenueCatUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 87F208D12DAD548F005F1592 /* XCRemoteSwiftPackageReference "purchases-ios" */;
 			productName = RevenueCatUI;

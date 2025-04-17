@@ -78,8 +78,6 @@ struct SpeechTabView: View {
         }
     }
     
-    // MARK: - Subviews
-    
     private var togglesSection: some View {
         VStack(spacing: 20) {
             Toggle("Show Text 顯示文字", isOn: $settings.showText)
@@ -209,11 +207,10 @@ struct SpeechTabView: View {
             .pickerStyle(.menu)
             .padding(.horizontal)
             
-            // New: Warning for Mandarin and Cantonese
             if settings.audioLanguage == .mandarin || settings.audioLanguage == .cantonese {
                 Text("Check Settings > Accessibility > Spoken Content > Voices to ensure the correct Chinese variant is selected. 請檢查設置 > 輔助功能 > 語音內容 > 語音，確保選擇正確的中文變體。")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.secondary) // Fixed syntax
                     .multilineTextAlignment(.leading)
                     .padding(.horizontal)
             }
@@ -222,7 +219,6 @@ struct SpeechTabView: View {
     
     private var playbackControlsSection: some View {
         HStack(spacing: 10) {
-            // Play/Stop Button
             Button(action: {
                 #if DEBUG
                 print("SpeechTabView: Play button tapped, mode = \(settings.playbackMode.rawValue), isPlaying = \(playbackManager.isPlaying), text = '\(settings.extractedText)'")
@@ -295,7 +291,6 @@ struct SpeechTabView: View {
             }
             .disabled(settings.sentences.isEmpty)
             
-            // Restart Button (Whole Passage mode only)
             if settings.playbackMode == .wholePassage {
                 Button(action: {
                     ttsManager.stopSpeaking()
@@ -321,7 +316,6 @@ struct SpeechTabView: View {
                 .disabled(settings.sentences.isEmpty)
             }
             
-            // Restart Button (Teacher Mode only)
             if settings.playbackMode == .teacherMode {
                 Button(action: {
                     if subscriptionManager.isPremium {
@@ -344,7 +338,6 @@ struct SpeechTabView: View {
                 }
             }
             
-            // Navigation Buttons (Sentence by Sentence mode only)
             if settings.playbackMode == .sentenceBySentence {
                 Button(action: {
                     playbackManager.currentSentenceIndex = 0
@@ -426,7 +419,6 @@ struct SpeechTabView: View {
     
     private var voiceAvailabilityWarningSection: some View {
         VStack(spacing: 8) {
-            // Existing: Voice availability warning
             if !ttsManager.isVoiceAvailable(for: settings.audioLanguage) {
                 Text("Please download the \(settings.audioLanguage.rawValue) voice in Settings > Accessibility > Spoken Content > Voices 請在設置 > 輔助功能 > 語音內容 > 語音中下載\(settings.audioLanguage.rawValue)語音")
                     .foregroundColor(.red)
@@ -434,7 +426,6 @@ struct SpeechTabView: View {
                     .padding(.horizontal)
             }
             
-            // New: Silent mode reminder
             Text("Ensure silent mode is off to hear playback. 請確保靜音模式已關閉以聽到播放。")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -446,13 +437,11 @@ struct SpeechTabView: View {
     private var bannerAdSection: some View {
         Group {
             if isFreeUser {
-                BannerAdView()
+                BannerAdContainer()
                     .frame(height: 50)
             }
         }
     }
-    
-    // MARK: - Helper Methods
     
     private func shouldHighlightSentence(index: Int) -> Bool {
         guard playbackManager.isPlaying else { return false }
@@ -464,7 +453,7 @@ struct SpeechTabView: View {
 #Preview {
     SpeechTabView()
         .environmentObject(SettingsModel())
-        .environmentObject(TTSManager())
+        .environmentObject(TTSManager.shared)
         .environmentObject(PlaybackManager())
         .environmentObject(SubscriptionManager.shared)
 }

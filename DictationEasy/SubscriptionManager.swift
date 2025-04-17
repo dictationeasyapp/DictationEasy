@@ -10,86 +10,117 @@ class SubscriptionManager: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var availablePackages: [RevenueCat.Package] = []
-    @Published var customerInfo: CustomerInfo? // Add this property to store customer info
+    @Published var customerInfo: CustomerInfo?
 
     private init() {
-        // Check initial subscription status
-        Task {
-            await checkSubscriptionStatus()
-        }
-        // Fetch available subscription packages
-        Task {
-            await fetchAvailablePackages()
-        }
-        // Listen for subscription status changes
-        NotificationCenter.default.addObserver(
-            forName: .subscriptionStatusDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task {
-                await self?.checkSubscriptionStatus()
+        // Check initial subscription status and fetch packages
+        checkSubscriptionStatus()
+        fetchAvailablePackages()
+    }
+
+    // Function to check status using getCustomerInfo (useful for initial load or manual refresh)
+    func checkSubscriptionStatus() {
+        RevenueCat.Purchases.shared.getCustomerInfo { [weak self] customerInfo, error in
+            guard let self = self else { return }
+            if let error = error {
+                self.errorMessage = error.localizedDescription
+                self.isPremium = false
+                self.customerInfo = nil
+                print("SubscriptionManager: Error checking subscription status: \(error)")
+                return
             }
+            guard let customerInfo = customerInfo else {
+                self.errorMessage = "Failed to retrieve customer info"
+                self.isPremium = false
+                self.customerInfo = nil
+                print("SubscriptionManager: Error - customerInfo is nil")
+                return
+            }
+            self.processUpdatedCustomerInfo(customerInfo)
+            print("SubscriptionManager: checkSubscriptionStatus completed.")
         }
     }
 
-    deinit {
-        NotificationCenter.default.removeObserver(self)
+    // New function to update status directly from provided CustomerInfo (e.g., from purchase callback)
+    func updateStatus(with customerInfo: CustomerInfo) {
+        print("SubscriptionManager: Updating status directly with provided CustomerInfo.")
+        self.processUpdatedCustomerInfo(customerInfo)
     }
 
-    func checkSubscriptionStatus() async {
-        do {
-            let customerInfo = try await RevenueCat.Purchases.shared.customerInfo()
-            self.customerInfo = customerInfo // Store the customer info
-            // Check if the user has an active premium subscription using the RevenueCat entitlement identifier
-            self.isPremium = customerInfo.entitlements["entlc0d28dc7a6"]?.isActive == true
-        } catch {
-            self.errorMessage = error.localizedDescription
-            self.isPremium = false
-            self.customerInfo = nil // Clear customer info on error
-        }
+    // Centralized logic to process CustomerInfo and update published properties
+    private func processUpdatedCustomerInfo(_ customerInfo: CustomerInfo) {
+        let isActive = customerInfo.entitlements["DictationEasy Premium"]?.isActive == true
+        self.customerInfo = customerInfo
+        self.isPremium = isActive
+        print("SubscriptionManager: Processed CustomerInfo - Updated isPremium to \(isActive), entitlement: \(String(describing: customerInfo.entitlements["DictationEasy Premium"]))")
     }
 
-    func fetchAvailablePackages() async {
-        do {
-            let offerings = try await RevenueCat.Purchases.shared.offerings()
-            if let packages = offerings.current?.availablePackages {
+    func fetchAvailablePackages() {
+        RevenueCat.Purchases.shared.getOfferings { [weak self] offerings, error in
+            guard let self = self else { return }
+            if let error = error {
+                self.errorMessage = error.localizedDescription
+                print("SubscriptionManager: Error fetching packages: \(error)")
+                return
+            }
+            if let packages = offerings?.current?.availablePackages {
                 self.availablePackages = packages
-            }
-        } catch {
-            self.errorMessage = error.localizedDescription
-        }
-    }
-
-    func purchasePackage(_ package: RevenueCat.Package) async {
-        isLoading = true
-        errorMessage = nil
-        do {
-            let purchaseResult = try await RevenueCat.Purchases.shared.purchase(package: package)
-            self.customerInfo = purchaseResult.customerInfo // Update customer info
-            if purchaseResult.customerInfo.entitlements["entlc0d28dc7a6"]?.isActive == true {
-                isPremium = true
-            }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isLoading = false
-    }
-
-    func restorePurchases() async {
-        isLoading = true
-        errorMessage = nil
-        do {
-            let customerInfo = try await RevenueCat.Purchases.shared.restorePurchases()
-            self.customerInfo = customerInfo // Update customer info
-            if customerInfo.entitlements["entlc0d28dc7a6"]?.isActive == true {
-                isPremium = true
+                print("SubscriptionManager: Fetched \(packages.count) available packages")
             } else {
-                errorMessage = "No active subscription found to restore 沒有找到可恢復的活躍訂閱"
+                print("SubscriptionManager: No available packages found")
             }
-        } catch {
-            errorMessage = error.localizedDescription
         }
-        isLoading = false
+    }
+
+    func purchasePackage(_ package: RevenueCat.Package) {
+        self.isLoading = true
+        self.errorMessage = nil
+        RevenueCat.Purchases.shared.purchase(package: package) { [weak self] transaction, customerInfo, error, userCancelled in
+            guard let self = self else { return }
+            self.isLoading = false
+            if userCancelled {
+                print("SubscriptionManager: Purchase cancelled by user")
+                return
+            }
+            if let error = error {
+                self.errorMessage = error.localizedDescription
+                print("SubscriptionManager: Purchase error: \(error)")
+                return
+            }
+            guard let customerInfo = customerInfo else {
+                self.errorMessage = "Failed to retrieve customer info after purchase"
+                print("SubscriptionManager: Error - customerInfo is nil after purchase")
+                self.checkSubscriptionStatus() // Fallback to fetching if nil
+                return
+            }
+            print("SubscriptionManager: Purchase successful, updating status with received CustomerInfo.")
+            self.updateStatus(with: customerInfo)
+        }
+    }
+
+    func restorePurchases() {
+        self.isLoading = true
+        self.errorMessage = nil
+        RevenueCat.Purchases.shared.restorePurchases { [weak self] customerInfo, error in
+            guard let self = self else { return }
+            self.isLoading = false
+            if let error = error {
+                self.errorMessage = error.localizedDescription
+                print("SubscriptionManager: Restore error: \(error)")
+                return
+            }
+            guard let customerInfo = customerInfo else {
+                self.errorMessage = "Failed to retrieve customer info after restore"
+                print("SubscriptionManager: Error - customerInfo is nil after restore")
+                self.checkSubscriptionStatus() // Fallback to fetching if nil
+                return
+            }
+            print("SubscriptionManager: Restore successful, updating status with received CustomerInfo.")
+            self.updateStatus(with: customerInfo)
+            if !self.isPremium {
+                self.errorMessage = "No active subscription found to restore 沒有找到可恢復的活躍訂閱"
+                print("SubscriptionManager: Restore completed, but no active premium entitlement found.")
+            }
+        }
     }
 }

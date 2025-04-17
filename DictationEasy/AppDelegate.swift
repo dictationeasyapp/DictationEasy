@@ -2,23 +2,44 @@ import UIKit
 import GoogleMobileAds
 import AppTrackingTransparency
 import AdSupport
-import RevenueCat
 
 class AppDelegate: UIResponder, UIApplicationDelegate {
     static var isTrackingAuthorized: Bool = false
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Request ATT permission before initializing AdMob and RevenueCat
-        requestTrackingAuthorization {
-            // Initialize the Google Mobile Ads SDK
-            MobileAds.initialize()
-            print("AdMob SDK initialized")
+        // Delay ATT request slightly to ensure app UI is ready
+        let workItem = DispatchWorkItem {
+            self.requestTrackingAuthorization {
+                // Initialize Google Mobile Ads SDK on the main thread
+                MobileAds.shared.start { initializationStatus in
+                    // Log the initialization status of each adapter for debugging
+                    let adapterStatuses = initializationStatus.adapterStatusesByClassName
+                    var allInitializedSuccessfully = true
 
-            // Initialize RevenueCat
-            Purchases.logLevel = .debug
-            Purchases.configure(withAPIKey: "appl_JrvqFvcSqXNUHBASFBSctYGKygR")
-            print("RevenueCat initialized")
+                    for (adapterName, status) in adapterStatuses {
+                        let stateDescription: String
+                        switch status.state {
+                        case .notReady:
+                            stateDescription = "Not Ready"
+                            allInitializedSuccessfully = false
+                        case .ready:
+                            stateDescription = "Ready"
+                        @unknown default:
+                            stateDescription = "Unknown"
+                            allInitializedSuccessfully = false
+                        }
+                        print("AdMob Adapter \(adapterName): \(stateDescription) - \(status.description)")
+                    }
+
+                    if allInitializedSuccessfully {
+                        print("AdMob SDK initialized successfully")
+                    } else {
+                        print("AdMob SDK initialization encountered issues with some adapters")
+                    }
+                }
+            }
         }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
         return true
     }
 

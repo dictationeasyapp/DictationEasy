@@ -28,7 +28,6 @@ struct ScanTabView: View {
     @State private var showSettingsError = false
     @State private var showUpgradePrompt = false
     @State private var showSubscriptionView = false
-    // New state for language selection
     @State private var selectedScanLanguage: ScanLanguage = .english
 
     var isFreeUser: Bool {
@@ -46,7 +45,7 @@ struct ScanTabView: View {
             case .english:
                 return "en-US"
             case .chinese:
-                return "zh-Hans" // Default to Simplified Chinese; Vision will also handle Traditional
+                return "zh-Hans"
             }
         }
     }
@@ -214,14 +213,14 @@ struct ScanTabView: View {
                             }
                         }
 
-                        Spacer() // Push banner ad to the bottom
+                        Spacer()
 
                         bannerAdSection
-                            .padding(.bottom, geometry.safeAreaInsets.bottom) // Account for tab bar
+                            .padding(.bottom, geometry.safeAreaInsets.bottom)
                     }
-                    .frame(minHeight: geometry.size.height) // Ensure ScrollView fills the screen
+                    .frame(minHeight: geometry.size.height)
                 }
-                .ignoresSafeArea(.all, edges: .bottom) // Prevent tab bar from clipping content
+                .ignoresSafeArea(.all, edges: .bottom)
             }
             .navigationTitle("Scan 掃描")
             .sheet(isPresented: $showCamera) {
@@ -257,7 +256,7 @@ struct ScanTabView: View {
                         UIApplication.shared.open(settingsURL)
                     }
                 }
-                Button("Cancel 取消", role: .cancel) { }
+                Button("Cancel 取消", role: .cancel) { } // Fixed the typo here
             } message: {
                 Text("Please enable camera access in Settings to take photos. 請在設置中啟用相機訪問以拍攝照片。")
             }
@@ -292,7 +291,6 @@ struct ScanTabView: View {
                 }
             }
             .onAppear {
-                // Reset transient state when re-entering the tab
                 selectedImage = nil
                 selectedItem = nil
                 #if DEBUG
@@ -302,11 +300,10 @@ struct ScanTabView: View {
         }
     }
 
-    // MARK: - Subviews
     private var bannerAdSection: some View {
         Group {
             if isFreeUser {
-                BannerAdView()
+                BannerAdContainer()
                     .frame(height: 50)
             }
         }
@@ -372,7 +369,6 @@ struct ScanTabView: View {
         guard let image = selectedImage else { return }
         Task {
             do {
-                // Pass the selected scan language instead of audioLanguage
                 try await ocrManager.processImage(image, scanLanguage: selectedScanLanguage)
                 if let ocrError = ocrManager.error {
                     throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: ocrError])
@@ -385,7 +381,6 @@ struct ScanTabView: View {
                 errorMessage = error.localizedDescription
                 showError = true
             }
-            // Reset image selection after processing
             selectedItem = nil
             selectedImage = nil
         }

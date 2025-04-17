@@ -24,7 +24,7 @@ struct TextTabView: View {
         self._selectedTab = selectedTab
         self.isEditingPastDictation = isEditingPastDictation
     }
-
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -56,7 +56,6 @@ struct TextTabView: View {
                                 .padding()
                         }
                         .onChange(of: settings.extractedText) { newText in
-                            // Sync ocrManager.extractedText when the user manually edits
                             ocrManager.updateExtractedText(newText)
                         }
                 }
@@ -88,10 +87,9 @@ struct TextTabView: View {
                         }
                         .disabled(true)
                         #endif
-
                         Button(action: {
                             settings.extractedText = ""
-                            ocrManager.updateExtractedText("") // Update ocrManager
+                            ocrManager.updateExtractedText("")
                             isTextEditorFocused = false
                         }) {
                             Label("Clear 清除", systemImage: "trash")
@@ -109,7 +107,7 @@ struct TextTabView: View {
                     Button(action: {
                         if !settings.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             settings.savePastDictation(text: settings.extractedText)
-                            ocrManager.updateExtractedText(settings.extractedText) // Sync on confirm
+                            ocrManager.updateExtractedText(settings.extractedText)
                         }
                         settings.playbackMode = .sentenceBySentence
                         selectedTab = .speech
@@ -127,7 +125,7 @@ struct TextTabView: View {
                     .disabled(settings.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     
                     if isFreeUser {
-                        BannerAdView()
+                        BannerAdContainer()
                             .frame(height: 50)
                     }
                 }
@@ -161,42 +159,7 @@ struct TextTabView: View {
                     }
                 }
             }
-            .onAppear {
-                // Only sync with OCRManager if there's a new OCR result or we're editing a past dictation
-                if isEditingPastDictation {
-                    if settings.editingDictationId == nil {
-                        settings.extractedText = ocrManager.extractedText
-                        #if DEBUG
-                        print("TextTabView.onAppear - Synced with ocrManager (editing past dictation, no editingId)")
-                        #endif
-                    }
-                } else if ocrManager.hasNewOCRResult {
-                    if ocrManager.isProcessing {
-                        isLoading = true
-                        #if DEBUG
-                        print("TextTabView.onAppear - OCR is processing, showing loading")
-                        #endif
-                    } else {
-                        settings.extractedText = ocrManager.extractedText
-                        isLoading = false
-                        ocrManager.hasNewOCRResult = false // Reset flag after syncing
-                        #if DEBUG
-                        print("TextTabView.onAppear - Synced with ocrManager (new OCR result): \(settings.extractedText)")
-                        #endif
-                    }
-                    settings.editingDictationId = nil
-                } else {
-                    // Preserve settings.extractedText unless there's a new OCR result
-                    ocrManager.updateExtractedText(settings.extractedText) // Ensure sync
-                    isLoading = false
-                    settings.editingDictationId = nil
-                    #if DEBUG
-                    print("TextTabView.onAppear - Preserved settings.extractedText: \(settings.extractedText)")
-                    #endif
-                }
-            }
             .onChange(of: ocrManager.extractedText) { newText in
-                // Only update if there's a new OCR result
                 if ocrManager.hasNewOCRResult {
                     DispatchQueue.main.async {
                         settings.extractedText = newText
@@ -205,6 +168,10 @@ struct TextTabView: View {
                         #if DEBUG
                         print("TextTabView.onChange(ocrManager.extractedText) - Updated settings.extractedText: \(newText)")
                         #endif
+                        // Defer focusing the TextEditor to avoid snapshotting issues
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            isTextEditorFocused = true
+                        }
                     }
                 }
             }
@@ -219,6 +186,55 @@ struct TextTabView: View {
             .onChange(of: selectedTab) { newTab in
                 if newTab != .text {
                     isTextEditorFocused = false
+                } else {
+                    // Defer focusing the TextEditor when switching to this tab
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        isTextEditorFocused = true
+                    }
+                }
+            }
+            .onAppear {
+                if isEditingPastDictation {
+                    if settings.editingDictationId == nil {
+                        settings.extractedText = ocrManager.extractedText
+                        #if DEBUG
+                        print("TextTabView.onAppear - Synced with ocrManager (editing past dictation, no editingId)")
+                        #endif
+                    }
+                    // Defer focusing the TextEditor to avoid snapshotting issues
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        isTextEditorFocused = true
+                    }
+                } else if ocrManager.hasNewOCRResult {
+                    if ocrManager.isProcessing {
+                        isLoading = true
+                        #if DEBUG
+                        print("TextTabView.onAppear - OCR is processing, showing loading")
+                        #endif
+                    } else {
+                        settings.extractedText = ocrManager.extractedText
+                        isLoading = false
+                        ocrManager.hasNewOCRResult = false
+                        #if DEBUG
+                        print("TextTabView.onAppear - Synced with ocrManager (new OCR result): \(settings.extractedText)")
+                        #endif
+                        // Defer focusing the TextEditor to avoid snapshotting issues
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            isTextEditorFocused = true
+                        }
+                    }
+                    settings.editingDictationId = nil
+                } else {
+                    ocrManager.updateExtractedText(settings.extractedText)
+                    isLoading = false
+                    settings.editingDictationId = nil
+                    #if DEBUG
+                    print("TextTabView.onAppear - Preserved settings.extractedText: \(settings.extractedText)")
+                    #endif
+                    // Defer focusing the TextEditor to avoid snapshotting issues
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        isTextEditorFocused = true
+                    }
                 }
             }
         }

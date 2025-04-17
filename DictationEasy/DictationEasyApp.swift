@@ -1,18 +1,30 @@
 import SwiftUI
 import RevenueCat
 
+// Configure RevenueCat as early as possible using a static initializer
+private enum RevenueCatSetup {
+    static let isConfigured: Bool = {
+        Purchases.logLevel = .debug
+        Purchases.configure(withAPIKey: "appl_JrvqFvcSqXNUHBASFBSctYGKygR")
+        Purchases.shared.delegate = PurchasesDelegateHandler.shared as PurchasesDelegate
+        print("RevenueCat initialized in RevenueCatSetup")
+        return true
+    }()
+}
+
 @main
 struct DictationEasyApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     @StateObject private var settings = SettingsModel()
     @StateObject private var ocrManager = OCRManager()
-    @StateObject private var ttsManager = TTSManager()
+    @StateObject private var ttsManager = TTSManager.shared // Use the shared instance
     @StateObject private var playbackManager = PlaybackManager()
     @StateObject private var subscriptionManager = SubscriptionManager.shared
 
     init() {
-        // Configure RevenueCat with your API key
-        RevenueCat.Purchases.configure(withAPIKey: "appl_JrvqFvcSqXNUHBASFBSctYGKygR")
-        RevenueCat.Purchases.shared.delegate = PurchasesDelegateHandler.shared
+        // Ensure RevenueCat is configured by referencing the static property
+        _ = RevenueCatSetup.isConfigured
     }
 
     var body: some Scene {
@@ -28,8 +40,7 @@ struct DictationEasyApp: App {
 }
 
 // Singleton to handle RevenueCat delegate methods
-@MainActor
-class PurchasesDelegateHandler: NSObject, RevenueCat.PurchasesDelegate, Sendable {
+final class PurchasesDelegateHandler: NSObject, RevenueCat.PurchasesDelegate, Sendable {
     static let shared = PurchasesDelegateHandler()
 
     private override init() {
@@ -37,8 +48,8 @@ class PurchasesDelegateHandler: NSObject, RevenueCat.PurchasesDelegate, Sendable
     }
 
     nonisolated func purchases(_ purchases: RevenueCat.Purchases, receivedUpdated customerInfo: RevenueCat.CustomerInfo) {
-        // Dispatch to the main actor since this method may be called on a background thread
-        Task { @MainActor in
+        // Ensure the notification is posted on the main thread
+        DispatchQueue.main.async {
             NotificationCenter.default.post(name: .subscriptionStatusDidChange, object: nil)
         }
     }

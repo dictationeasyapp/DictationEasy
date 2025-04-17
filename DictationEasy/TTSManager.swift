@@ -4,6 +4,8 @@ import SwiftUI
 
 @MainActor
 class TTSManager: NSObject, ObservableObject, TTSManagerProtocol {
+    static let shared = TTSManager() // Add a shared instance to reuse across the app
+
     private let synthesizer = AVSpeechSynthesizer()
     @Published var isPlaying: Bool = false
     @Published var error: String?
@@ -15,6 +17,10 @@ class TTSManager: NSObject, ObservableObject, TTSManagerProtocol {
         #if DEBUG
         print("TTSManager.init: Initialized")
         #endif
+        // Note: The following warnings might appear in logs due to AVSpeechSynthesizer's internal use of private frameworks:
+        // - NSBundle file:///System/Library/PrivateFrameworks/TextToSpeech.framework/ principal class is nil because all fallbacks have failed
+        // - NSBundle file:///System/Library/PrivateFrameworks/AccessibilityUtilities.framework/ principal class is nil because all fallbacks have failed
+        // These are system-level warnings and can be ignored as long as TTS functionality works. Monitor for future iOS updates.
     }
 
     func speak(text: String, language: AudioLanguage, rate: Double) {

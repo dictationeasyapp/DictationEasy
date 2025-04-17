@@ -5,9 +5,7 @@ target 'DictationEasy' do
 
   # Pods for DictationEasy
   pod 'Google-Mobile-Ads-SDK'
-  pod 'RevenueCat'
-  pod 'RevenueCatUI'
-
+ 
 end
 
 post_install do |installer|

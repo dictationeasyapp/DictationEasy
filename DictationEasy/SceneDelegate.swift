@@ -1,5 +1,5 @@
 import UIKit
-import SwiftUI // Import SwiftUI to use UIHostingController
+import SwiftUI
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
@@ -12,8 +12,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let contentView = ContentView()
             .environmentObject(SettingsModel())
             .environmentObject(OCRManager())
-            .environmentObject(TTSManager())
+            .environmentObject(TTSManager.shared) // Use shared instance
             .environmentObject(PlaybackManager())
+            .environmentObject(SubscriptionManager.shared) // Add SubscriptionManager
 
         // Create a UIHostingController to host the SwiftUI ContentView
         let hostingController = UIHostingController(rootView: contentView)

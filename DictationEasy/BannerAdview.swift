@@ -1,6 +1,25 @@
 import SwiftUI
 import GoogleMobileAds
 
+struct BannerAdContainer: View {
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
+    var body: some View {
+        Group {
+            if !subscriptionManager.isPremium {
+                BannerAdView()
+                    .frame(height: 50)
+                    .onAppear {
+                        print("BannerAdContainer: Requesting ad, isPremium: \(subscriptionManager.isPremium)")
+                    }
+            } else {
+                EmptyView()
+                    .onAppear {
+                        print("BannerAdContainer: Not showing ad because user is premium")
+                    }
+            }
+        }
+    }
+}
 struct BannerAdView: UIViewControllerRepresentable {
     // Use the test ad unit ID for now
     private let adUnitID: String = "ca-app-pub-3940256099942544/2934735716"
@@ -15,7 +34,6 @@ struct BannerAdView: UIViewControllerRepresentable {
         // Configure the ad request based on ATT status
         let request = Request()
         if !AppDelegate.isTrackingAuthorized {
-            // Use non-personalized ads if tracking is not authorized
             let extras = Extras()
             extras.additionalParameters = ["npa": "1"] // Non-personalized ads
             request.register(extras)
@@ -56,5 +74,5 @@ struct BannerAdView: UIViewControllerRepresentable {
 }
 
 #Preview {
-    BannerAdView()
+    BannerAdContainer().environmentObject(SubscriptionManager.shared)
 }
