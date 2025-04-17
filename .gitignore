@@ -3,3 +3,5 @@
 xcuserdata/
 dictationeasyapp/
 .DS_Store
+Secrets.plist
+DictationEasy/Secrets.plist

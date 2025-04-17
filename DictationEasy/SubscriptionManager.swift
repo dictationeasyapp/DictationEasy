@@ -7,6 +7,11 @@ import Combine
 class SubscriptionManager: ObservableObject {
     static let shared = SubscriptionManager()
 
+    // --- Define the Entitlement ID as a class constant ---
+    // !!! IMPORTANT: Double-check this value matches your RevenueCat dashboard !!!
+    private let premiumEntitlementID = "DictationEasy Premium"
+    // --- END ---
+
     @Published var isPremium: Bool = false
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
@@ -15,7 +20,7 @@ class SubscriptionManager: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
-    // *** MODIFIED: init only sets up observer ***
+    // *** init only sets up observer ***
     private init() {
         // Add observer in init
         NotificationCenter.default.publisher(for: .subscriptionStatusDidChange)
@@ -25,10 +30,10 @@ class SubscriptionManager: ObservableObject {
             }
             .store(in: &cancellables)
         print("SubscriptionManager: Initialized and observer set.")
-        // *** REMOVED initial calls to checkSubscriptionStatus() and fetchAvailablePackages() ***
+        // Calls to checkSubscriptionStatus() and fetchAvailablePackages() are deferred to initializeManager()
     }
 
-    // *** NEW: Function to be called AFTER RevenueCat configuration ***
+    // *** Function to be called AFTER RevenueCat configuration ***
     func initializeManager() {
         print("SubscriptionManager: initializeManager() called.")
         // Now perform the initial fetches
@@ -38,7 +43,7 @@ class SubscriptionManager: ObservableObject {
 
     // Function to check status using getCustomerInfo (useful for initial load or manual refresh)
     func checkSubscriptionStatus() {
-        // Add check to ensure configuration happened, although the fatalError should prevent this now
+        // Add check to ensure configuration happened
         guard Purchases.isConfigured else {
              print("SubscriptionManager: checkSubscriptionStatus skipped - Purchases not configured yet.")
              return
@@ -65,7 +70,7 @@ class SubscriptionManager: ObservableObject {
         }
     }
 
-    // New function to update status directly from provided CustomerInfo (e.g., from purchase callback)
+    // New function to update status directly from provided CustomerInfo (e.g., from purchase callback or delegate)
     func updateStatus(with customerInfo: CustomerInfo) {
         print("SubscriptionManager: Updating status directly with provided CustomerInfo.")
         self.processUpdatedCustomerInfo(customerInfo)
@@ -83,11 +88,9 @@ class SubscriptionManager: ObservableObject {
         print("  Active Subscriptions: \(customerInfo.activeSubscriptions)")
         print("  Entitlements Dictionary: \(customerInfo.entitlements.all)")
 
-        // !!! IMPORTANT: Replace "DictationEasy Premium" with your actual Entitlement ID from RevenueCat !!!
-        let entitlementID = "DictationEasy Premium"
-
-        if let premiumEntitlement = customerInfo.entitlements[entitlementID] {
-            print("  Found Entitlement '\(entitlementID)':")
+        // *** Use the class constant ***
+        if let premiumEntitlement = customerInfo.entitlements[premiumEntitlementID] {
+            print("  Found Entitlement '\(premiumEntitlementID)':") // Use constant in log
             print("    isActive: \(premiumEntitlement.isActive)")
             print("    willRenew: \(premiumEntitlement.willRenew)")
             print("    periodType: \(premiumEntitlement.periodType)")
@@ -100,15 +103,16 @@ class SubscriptionManager: ObservableObject {
             print("    unsubscribeDetectedAt: \(String(describing: premiumEntitlement.unsubscribeDetectedAt))")
             print("    billingIssueDetectedAt: \(String(describing: premiumEntitlement.billingIssueDetectedAt))")
         } else {
-            print("  Entitlement '\(entitlementID)' NOT FOUND in customerInfo.entitlements")
+            print("  Entitlement '\(premiumEntitlementID)' NOT FOUND in customerInfo.entitlements") // Use constant in log
         }
         // --- End Enhanced Debugging ---
 
-        // !!! IMPORTANT: Use the same correct entitlementID here !!!
-        let isActive = customerInfo.entitlements[entitlementID]?.isActive == true
+        // *** Use the class constant ***
+        let isActive = customerInfo.entitlements[premiumEntitlementID]?.isActive == true
         self.customerInfo = customerInfo // Store the latest customer info
         self.isPremium = isActive
-        print("SubscriptionManager: Processed CustomerInfo - Updated isPremium to \(isActive), using entitlement ID '\(entitlementID)': \(String(describing: customerInfo.entitlements[entitlementID]))")
+        // *** Use the class constant ***
+        print("SubscriptionManager: Processed CustomerInfo - Updated isPremium to \(isActive), using entitlement ID '\(premiumEntitlementID)': \(String(describing: customerInfo.entitlements[premiumEntitlementID]))")
     }
 
 
