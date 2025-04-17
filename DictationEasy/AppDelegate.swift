@@ -10,11 +10,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
         // --- RevenueCat Configuration ---
-        Purchases.logLevel = .debug
-        // Make sure you are using the correct API key
-        Purchases.configure(withAPIKey: "appl_JrvqFvcSqXNUHBASFBSctYGKygR")
-        Purchases.shared.delegate = PurchasesDelegateHandler.shared // Assign the delegate *after* configuring
-        print("RevenueCat configured and delegate set in AppDelegate")
+                Purchases.logLevel = .debug
+
+                // Load the API key from Secrets.plist
+                guard let apiKey = loadRevenueCatAPIKey() else {
+                    fatalError("Failed to load RevenueCat API key from Secrets.plist")
+                }
+
+                Purchases.configure(withAPIKey: apiKey)
+                Purchases.shared.delegate = PurchasesDelegateHandler.shared
+                print("RevenueCat configured and delegate set in AppDelegate")
+
+                SubscriptionManager.shared.initializeManager()
+                // --- End RevenueCat Configuration ---
 
         // *** NEW: Initialize SubscriptionManager AFTER RevenueCat config ***
         SubscriptionManager.shared.initializeManager()
@@ -46,6 +54,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         return true
     }
+    // Helper method to load the RevenueCat API key from Secrets.plist
+        private func loadRevenueCatAPIKey() -> String? {
+            guard let path = Bundle.main.path(forResource: "Secrets", ofType: "plist"),
+                  let dict = NSDictionary(contentsOfFile: path) as? [String: Any],
+                  let apiKey = dict["RevenueCatAPIKey"] as? String else {
+                return nil
+            }
+            return apiKey
+        }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         requestTrackingAuthorization() // Request again when app becomes active if needed
