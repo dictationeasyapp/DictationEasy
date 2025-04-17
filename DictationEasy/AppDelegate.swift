@@ -1,87 +1,94 @@
 import UIKit
-import GoogleMobileAds
+import RevenueCat
 import AppTrackingTransparency
-import AdSupport
+import GoogleMobileAds
 
 class AppDelegate: UIResponder, UIApplicationDelegate {
+
     static var isTrackingAuthorized: Bool = false
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Delay ATT request slightly to ensure app UI is ready
-        let workItem = DispatchWorkItem {
-            self.requestTrackingAuthorization {
-                // Initialize Google Mobile Ads SDK on the main thread
-                MobileAds.shared.start { initializationStatus in
-                    // Log the initialization status of each adapter for debugging
-                    let adapterStatuses = initializationStatus.adapterStatusesByClassName
-                    var allInitializedSuccessfully = true
 
-                    for (adapterName, status) in adapterStatuses {
-                        let stateDescription: String
-                        switch status.state {
-                        case .notReady:
-                            stateDescription = "Not Ready"
-                            allInitializedSuccessfully = false
-                        case .ready:
-                            stateDescription = "Ready"
-                        @unknown default:
-                            stateDescription = "Unknown"
-                            allInitializedSuccessfully = false
-                        }
-                        print("AdMob Adapter \(adapterName): \(stateDescription) - \(status.description)")
-                    }
+        // --- RevenueCat Configuration ---
+        Purchases.logLevel = .debug
+        // Make sure you are using the correct API key
+        Purchases.configure(withAPIKey: "appl_JrvqFvcSqXNUHBASFBSctYGKygR")
+        Purchases.shared.delegate = PurchasesDelegateHandler.shared // Assign the delegate *after* configuring
+        print("RevenueCat configured and delegate set in AppDelegate")
 
-                    if allInitializedSuccessfully {
-                        print("AdMob SDK initialized successfully")
-                    } else {
-                        print("AdMob SDK initialization encountered issues with some adapters")
-                    }
-                }
-            }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+        // *** NEW: Initialize SubscriptionManager AFTER RevenueCat config ***
+        SubscriptionManager.shared.initializeManager()
+        // *** END NEW ***
+
+        // --- End RevenueCat Configuration ---
+
+        // --- Google Mobile Ads Configuration ---
+        MobileAds.shared.start(completionHandler: { status in
+             print("AdMob SDK initialization status: \(status.adapterStatusesByClassName)")
+             // Check adapter status and handle initialization issues if needed
+             let adapterStatuses = status.adapterStatusesByClassName
+             var notReadyAdapters: [String] = []
+             for (adapterClassName, status) in adapterStatuses {
+                 if status.state != .ready {
+                    notReadyAdapters.append("\(adapterClassName): \(status.description)")
+                 }
+             }
+             if !notReadyAdapters.isEmpty {
+                 print("AdMob SDK initialization encountered issues with some adapters:")
+                 notReadyAdapters.forEach { print("  - \($0)") }
+             }
+         })
+        // --- End Google Mobile Ads Configuration ---
+
+
+        // Request App Tracking Transparency authorization
+        requestTrackingAuthorization()
+
         return true
     }
 
-    // MARK: - ATT Permission Request
-    private func requestTrackingAuthorization(completion: @escaping () -> Void) {
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        requestTrackingAuthorization() // Request again when app becomes active if needed
+        // Optionally trigger a subscription status check when returning to foreground
+        // SubscriptionManager.shared.checkSubscriptionStatus()
+    }
+
+    func requestTrackingAuthorization() {
         if #available(iOS 14, *) {
             ATTrackingManager.requestTrackingAuthorization { status in
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { // Update on main thread
                     switch status {
                     case .authorized:
-                        print("ATT: Tracking authorized")
                         AppDelegate.isTrackingAuthorized = true
-                        let idfa = ASIdentifierManager.shared().advertisingIdentifier.uuidString
-                        print("IDFA: \(idfa)")
+                        print("ATT: Tracking authorized")
                     case .denied:
+                        AppDelegate.isTrackingAuthorized = false
                         print("ATT: Tracking denied")
-                        AppDelegate.isTrackingAuthorized = false
                     case .notDetermined:
+                        AppDelegate.isTrackingAuthorized = false
                         print("ATT: Tracking not determined")
-                        AppDelegate.isTrackingAuthorized = false
                     case .restricted:
+                        AppDelegate.isTrackingAuthorized = false
                         print("ATT: Tracking restricted")
-                        AppDelegate.isTrackingAuthorized = false
                     @unknown default:
-                        print("ATT: Unknown tracking status")
                         AppDelegate.isTrackingAuthorized = false
+                        print("ATT: Tracking unknown status")
                     }
-                    completion()
+                    // Ensure AdMob request is updated based on status if needed here or in BannerAdView
                 }
             }
         } else {
+            // Fallback for earlier iOS versions (tracking is allowed by default)
             AppDelegate.isTrackingAuthorized = true
-            completion()
         }
     }
 
-    // MARK: - UISceneSession Lifecycle
+    // MARK: UISceneSession Lifecycle
+
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
         return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
     }
 
     func application(_ application: UIApplication, didDiscardSceneSessions sceneSessions: Set<UISceneSession>) {
-        // Called when the user discards a scene session.
     }
 }
