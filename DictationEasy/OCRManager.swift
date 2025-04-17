@@ -76,11 +76,13 @@ class OCRManager: ObservableObject {
             }
             #endif
 
+            // --- MODIFIED: Join observations with newline first, then clean ---
             let recognizedText = observations.compactMap { observation in
                 observation.topCandidates(1).first?.string
-            }.joined(separator: "\n")
+            }.joined(separator: "\n") // Use newline from observations directly
 
             Task { @MainActor in
+                // Clean the text, preserving original punctuation where possible
                 let cleanedText = self.cleanText(recognizedText)
                 self.extractedText = cleanedText.isEmpty ? "No text detected. 沒有檢測到文字。" : cleanedText
                 self.isProcessing = false
@@ -100,8 +102,8 @@ class OCRManager: ObservableObject {
         // Configure the request for better accuracy
         request.recognitionLanguages = prioritizedLanguages
         request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = false
-        request.minimumTextHeight = 0.015
+        request.usesLanguageCorrection = false // Keep false for raw results
+        request.minimumTextHeight = 0.015 // Adjust if needed
 
         do {
             try requestHandler.perform([request])
@@ -127,29 +129,31 @@ class OCRManager: ObservableObject {
         #endif
     }
 
+    // --- UPDATED cleanText function ---
     private func cleanText(_ text: String) -> String {
-        let chineseRegex = try! NSRegularExpression(pattern: "[\\u4e00-\\u9fff]+")
-        let range = NSRange(text.startIndex..., in: text)
-        let matches = chineseRegex.matches(in: text, range: range)
-        var cleanedText = text
+        // 1. Split into paragraphs (using newline as separator from OCR)
+        let paragraphs = text.components(separatedBy: .newlines)
 
-        // Special handling for Chinese text
-        if !matches.isEmpty {
-            cleanedText = text.components(separatedBy: .whitespacesAndNewlines)
-                .filter { component in
-                    let componentRange = NSRange(component.startIndex..., in: component)
-                    return chineseRegex.firstMatch(in: component, range: componentRange) != nil ||
-                           component.rangeOfCharacter(from: .punctuationCharacters) != nil
-                }
-                .joined(separator: " ")
+        // 2. Process each paragraph: split into sentences, trim, and filter empty
+        let processedSentences = paragraphs.flatMap { paragraph -> [String] in
+            // Use the existing String extension to split, preserving original punctuation
+            let sentences = paragraph.splitIntoSentences()
+            return sentences.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } // Trim each sentence
+                           .filter { !$0.isEmpty } // Filter out empty results
         }
 
-        // Split by sentence-ending punctuation and clean up
-        return cleanedText.components(separatedBy: CharacterSet(charactersIn: ".!?。！？"))
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: ".\n")
+        // 3. Join the processed sentences back together with a single newline
+        let final_text = processedSentences.joined(separator: "\n")
+
+        #if DEBUG
+        print("OCRManager.cleanText: Input length \(text.count), Output length \(final_text.count)")
+        // Uncomment to see exact output: print("OCRManager.cleanText: Final cleaned text:\n\(final_text)")
+        #endif
+
+        return final_text
     }
+    // --- END UPDATED cleanText function ---
+
 
     private func resizeImage(_ image: UIImage, toMaxDimension maxDimension: CGFloat) -> UIImage? {
         let size = image.size
@@ -162,11 +166,12 @@ class OCRManager: ObservableObject {
             newSize = CGSize(width: maxDimension * aspectRatio, height: maxDimension)
         }
 
+        // Only resize if necessary
         guard size.width > maxDimension || size.height > maxDimension else {
             return image
         }
 
-        UIGraphicsBeginImageContextWithOptions(newSize, false, 0.0)
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 0.0) // Use scale 0.0 for device scale
         image.draw(in: CGRect(origin: .zero, size: newSize))
         let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
         UIGraphicsEndImageContext()
