@@ -34,7 +34,6 @@ struct ScanTabView: View {
     // State for Delete Confirmation
     @State private var entryToDelete: DictationEntry? = nil
 
-
     var isFreeUser: Bool {
         return !subscriptionManager.isPremium
     }
@@ -62,14 +61,13 @@ struct ScanTabView: View {
                 photoAndCameraButtons // Extracted
 
                 // --- Image Preview & Action Buttons (Conditional) ---
-                 VStack { // Group these related items
-                     if let image = selectedImage {
-                         imagePreviewSection(image: image)
-                         actionButtonsSection
-                     }
-                 }
-                 .padding(.top, selectedImage != nil ? 10 : 0) // Add space only if image is shown
-
+                VStack { // Group these related items
+                    if let image = selectedImage {
+                        imagePreviewSection(image: image)
+                        actionButtonsSection
+                    }
+                }
+                .padding(.top, selectedImage != nil ? 10 : 0) // Add space only if image is shown
 
                 // --- Past Dictations Section (Using List) ---
                 Section {
@@ -86,10 +84,8 @@ struct ScanTabView: View {
                         }
                     }
                     .listStyle(.plain)
-                    // Add explicit background if needed with plain style
-                    // .background(Color(.systemGroupedBackground))
                     .frame(maxHeight: .infinity) // Allow list to take available space
-
+                    .onAppear { settings.loadPastDictationsIfNeeded() } // Added for lazy loading
                 } header: {
                     Text("Past Dictation 過去文章")
                         .font(.headline)
@@ -98,10 +94,8 @@ struct ScanTabView: View {
                 }
                 // --- End Past Dictations Section ---
 
-
                 // Banner Ad at the bottom
                 bannerAdSection
-
             } // End Main VStack
             .background(Color(.systemGroupedBackground).ignoresSafeArea(.all, edges: .all))
             .navigationTitle("Scan 掃描")
@@ -132,7 +126,6 @@ struct ScanTabView: View {
         } // End NavigationView
         .navigationViewStyle(.stack)
     } // End body
-
 
     // MARK: - Subviews (Computed Properties)
 
@@ -205,8 +198,6 @@ struct ScanTabView: View {
          }.padding(.horizontal).padding(.bottom) // Add bottom padding
     }
 
-    // NOTE: pastDictationsListSection was integrated into the main body with List
-
     // Helper View Builder for individual dictation row
     @ViewBuilder
     private func dictationEntryRow(_ entry: DictationEntry) -> some View {
@@ -261,7 +252,6 @@ struct ScanTabView: View {
     }
     // --- **** END RESTORED IMPLEMENTATIONS **** ---
 
-
     // MARK: - Alert Components (Restored Implementations)
     @ViewBuilder private func alertButtonsGoToSettings() -> some View {
          Button("Go to Settings 前往設置") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
@@ -292,7 +282,6 @@ struct ScanTabView: View {
         Text("Are you sure you want to delete this entry dated \(entryData.date.formatted(date: .numeric, time: .omitted))?\n您確定要刪除此日期為 \(entryData.date.formatted(date: .numeric, time: .omitted)) 的條目嗎？")
     }
     // --- **** END RESTORED ALERT COMPONENTS **** ---
-
 
     // MARK: - Permission & Processing Logic (Restored Implementations)
     private func checkPhotoLibraryPermission() {
@@ -364,7 +353,6 @@ struct ScanTabView: View {
     }
     // --- **** END RESTORED FUNCTIONS **** ---
 
-
     #else // Fallback for non-UIKit platforms
     // Fallback Body
     var body: some View {
@@ -375,7 +363,6 @@ struct ScanTabView: View {
     }
     #endif // End #if canImport(UIKit)
 } // End struct ScanTabView
-
 
 // Preview needs adjustments if not on iOS or missing dependencies
 #if canImport(UIKit)
