@@ -81,6 +81,7 @@ final class PurchasesDelegateHandler: NSObject, RevenueCat.PurchasesDelegate, Se
 // Notification name for subscription status changes
 extension Notification.Name {
     static let subscriptionStatusDidChange = Notification.Name("subscriptionStatusDidChange")
+    static let ATTStatusUpdated = Notification.Name("ATTStatusUpdated")
 }
 
 // --- Ensure AppDelegate configures RevenueCat and sets the delegate ---
