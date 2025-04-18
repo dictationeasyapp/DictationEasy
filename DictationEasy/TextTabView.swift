@@ -26,72 +26,67 @@ struct TextTabView: View {
     }
 
     var body: some View {
-        // Use NavigationView to provide a title bar
         NavigationView {
-            // Main container VStack
-            VStack(spacing: 0) { // Use 0 spacing and manage padding manually
+            VStack(spacing: 0) {
                 if isLoading {
                     ProgressView("Extracting text... 正在提取文字...")
                         .progressViewStyle(CircularProgressViewStyle())
                         .padding()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity) // Center the progress view
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    // Text Editor section
                     TextEditor(text: $settings.extractedText)
                         .font(.system(size: settings.fontSize))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity) // Allow editor to expand
-                        .padding(8) // Internal padding for text
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(8) // Internal padding
                         .background(Color(.systemGray6)) // Background for the text area
                         .cornerRadius(10)
-                        .padding(.horizontal) // Padding left/right of the editor
-                        .padding(.top) // Padding above the editor
-                        .focused($isTextEditorFocused) // Manage focus state
-                        .toolbar { // Keyboard toolbar
+                        .padding(.horizontal)
+                        .padding(.top)
+                        .focused($isTextEditorFocused)
+                        .toolbar {
                             ToolbarItemGroup(placement: .keyboard) {
-                                Spacer() // Push button to the right
+                                Spacer()
                                 Button("Done 完成") {
-                                    isTextEditorFocused = false // Dismiss keyboard action
+                                    isTextEditorFocused = false
                                 }
                             }
                         }
-                        // --- MODIFIED PLACEHOLDER ---
+                        // Apply the placeholder modifier
                         .placeholder(when: settings.extractedText.isEmpty) {
+                            // Placeholder View Builder
                             Text("Extracted text will appear here\n提取的文字將顯示在此處")
                                 .font(.system(size: settings.fontSize))
                                 .foregroundColor(.gray)
-                                .padding(.horizontal, 12) // Match TextEditor internal horizontal padding
-                                .padding(.vertical, 16) // Match TextEditor internal vertical padding
-                                .allowsHitTesting(false)
-                                // Explicitly control opacity based on the condition
-                                .opacity(settings.extractedText.isEmpty ? 1 : 0)
+                                .padding(.horizontal, 12) // Align with TextEditor padding + internal padding
+                                .padding(.vertical, 16) // Align with TextEditor padding + internal padding
+                                .allowsHitTesting(false) // Let taps pass through to TextEditor
                         }
-                        // --- END MODIFIED PLACEHOLDER ---
                         .onChange(of: settings.extractedText) { newText in
-                            // Keep OCR Manager synced if user edits manually
-                            if !ocrManager.hasNewOCRResult { // Avoid loop if change came from OCR
+                             // Keep OCR Manager synced if user edits manually
+                            if !ocrManager.hasNewOCRResult {
                                 ocrManager.updateExtractedText(newText)
                             }
                         }
 
-                    // Reminder Text
+
+                    // Reminder Text (No changes needed here)
                     Text("For the best experience, please split your text into sentences before confirming.\n為獲得最佳體驗，請在確認前將文字分成句子。")
                         .font(.caption)
                         .italic()
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
-                        .padding(.vertical, 8) // Space between editor and buttons
+                        .padding(.vertical, 8)
 
-                } // End else (not isLoading)
+                } // End else
 
-                // Buttons and Ad Section (at the bottom)
+                // Buttons and Ad Section (No changes needed here)
                 VStack(spacing: 10) {
                     HStack(spacing: 20) {
-                        // Copy Button
                         #if canImport(UIKit)
                         Button(action: {
                             UIPasteboard.general.string = settings.extractedText
-                            isTextEditorFocused = false // Dismiss keyboard on action
+                            isTextEditorFocused = false
                         }) {
                             Label("Copy 複製", systemImage: "doc.on.doc")
                                 .font(.headline)
@@ -102,15 +97,12 @@ struct TextTabView: View {
                                 .cornerRadius(10)
                         }
                         #else
-                        // Fallback for non-UIKit
                         Button(action: {}) { Label("Copy 複製", systemImage: "doc.on.doc").font(.headline).foregroundColor(.white).frame(maxWidth: .infinity).padding().background(Color.gray).cornerRadius(10) }.disabled(true)
                         #endif
-
-                        // Clear Button
                         Button(action: {
                             settings.extractedText = ""
-                            ocrManager.updateExtractedText("") // Keep OCR manager synced
-                            isTextEditorFocused = false // Dismiss keyboard
+                            ocrManager.updateExtractedText("")
+                            isTextEditorFocused = false
                         }) {
                             Label("Clear 清除", systemImage: "trash")
                                 .font(.headline)
@@ -122,48 +114,44 @@ struct TextTabView: View {
                         }
                     }
                     .padding(.horizontal)
-                    .padding(.top, 10) // Space above button row
+                    .padding(.top, 10)
 
-                    // Confirm Button
                     Button(action: {
-                        isTextEditorFocused = false // Dismiss keyboard first
+                        isTextEditorFocused = false
                         if !settings.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             settings.savePastDictation(text: settings.extractedText)
-                            // No need to update ocrManager text here, already done by .onChange
                         }
-                        settings.playbackMode = .sentenceBySentence // Default mode for speech tab
-                        selectedTab = .speech // Navigate to speech tab
+                        settings.playbackMode = .sentenceBySentence
+                        selectedTab = .speech
                     }) {
                         Label("Confirm 確認", systemImage: "checkmark")
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(settings.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray : Color.blue) // Use gray when disabled
+                            .background(settings.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray : Color.blue)
                             .cornerRadius(10)
                     }
                     .padding(.horizontal)
-                    .disabled(settings.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) // Disable if no text
+                    .disabled(settings.extractedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                    // Banner Ad Container
-                     if isFreeUser {
-                         // Add spacer ONLY if ad is shown to push buttons up slightly
+                    if isFreeUser {
+                        Spacer().frame(height: 10)
+                        BannerAdContainer()
+                            .frame(height: 50)
+                            .frame(maxWidth: .infinity)
+                    } else {
                          Spacer().frame(height: 10)
-                         BannerAdContainer()
-                             .frame(height: 50)
-                             .frame(maxWidth: .infinity)
-                     } else {
-                          Spacer().frame(height: 10) // Consistent small spacing even for premium users
-                     }
+                    }
 
-                } // End Button VStack
-                .padding(.bottom) // Add padding below buttons/ad
-                .background(Color(.systemBackground)) // Background for button area
+                }
+                .padding(.bottom)
+                .background(Color(.systemBackground))
 
-            } // End Main VStack
-            .background(Color(.systemGroupedBackground)) // Background for the whole view under the nav bar
+            }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Text 文字")
-            .navigationBarTitleDisplayMode(.inline) // Keep title smaller
+            .navigationBarTitleDisplayMode(.inline)
             .alert("Settings Error 設置錯誤", isPresented: $showSettingsError) {
                 Button("OK 確定", role: .cancel) { settings.error = nil }
             } message: { Text(settings.error ?? "Unknown error 未知錯誤") }
@@ -173,77 +161,72 @@ struct TextTabView: View {
             )) {
                 Button("OK 確定", role: .cancel) {}
             } message: { Text(ocrError ?? "Unknown error 未知錯誤") }
-
-            // --- Simplified Focus/Update Logic ---
             .onChange(of: settings.error) { newError in showSettingsError = (newError != nil) }
-            .onChange(of: ocrManager.error) { newError in ocrError = newError /* No need for DispatchQueue here */ }
-            .onChange(of: ocrManager.isProcessing) { isProcessing in isLoading = isProcessing /* No need for DispatchQueue here */ }
+            .onChange(of: ocrManager.error) { newError in ocrError = newError }
+            .onChange(of: ocrManager.isProcessing) { isProcessing in isLoading = isProcessing }
             .onChange(of: selectedTab) { newTab in
-                // Dismiss keyboard if navigating away
                 if newTab != .text {
                     isTextEditorFocused = false
                 } else {
-                     // Set focus immediately when navigating TO this tab
-                     // (Removed asyncAfter)
-                     isTextEditorFocused = true
+                    isTextEditorFocused = true // Focus when switching to tab
                 }
             }
             .onChange(of: ocrManager.extractedText) { newText in
                  if ocrManager.hasNewOCRResult {
-                     // Update settings only when OCR provides a new result
                      settings.extractedText = newText
-                     ocrManager.hasNewOCRResult = false // Reset flag
+                     ocrManager.hasNewOCRResult = false
                      #if DEBUG
                      print("TextTabView.onChange(ocrManager.extractedText) - Updated settings from NEW OCR.")
                      #endif
-                     // Set focus immediately after receiving OCR text
-                     // (Removed asyncAfter)
-                      isTextEditorFocused = true
+                      isTextEditorFocused = true // Focus after OCR
                  }
             }
             .onAppear {
                  #if DEBUG
                  print("TextTabView.onAppear: Editing=\(isEditingPastDictation), HasNewOCR=\(ocrManager.hasNewOCRResult), Processing=\(ocrManager.isProcessing)")
                  #endif
-                 // Simplified onAppear logic
-                 isLoading = ocrManager.isProcessing // Sync loading state
+                 isLoading = ocrManager.isProcessing
                  if !isLoading && !isEditingPastDictation && !ocrManager.hasNewOCRResult {
-                     // If not loading, not editing, and no *new* OCR result waiting,
-                     // ensure the OCR manager has the current text from settings.
                      ocrManager.updateExtractedText(settings.extractedText)
                  }
-                  // Set initial focus immediately if applicable
-                  // (Removed asyncAfter)
-                  isTextEditorFocused = true
+                 isTextEditorFocused = true // Focus on appear
             }
-            // --- End Simplified Focus/Update Logic ---
 
-        } // End NavigationView
-        .navigationViewStyle(.stack) // Use stack style
-        .ignoresSafeArea(.keyboard, edges: .bottom) // Allow content to go under keyboard
+        }
+        .navigationViewStyle(.stack)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 }
 
-// --- Placeholder View Extension (No changes needed) ---
+
+// --- UPDATED Placeholder View Extension ---
 extension View {
+    // Apply this modifier to a TextEditor
     func placeholder<Content: View>(
         when shouldShow: Bool,
-        alignment: Alignment = .topLeading,
+        alignment: Alignment = .topLeading, // Default alignment
         @ViewBuilder placeholder: () -> Content) -> some View {
+
         ZStack(alignment: alignment) {
-            if shouldShow {
-                placeholder().opacity(shouldShow ? 1 : 0) // Control opacity explicitly
-            }
+            // Place the TextEditor (self) first
             self
+
+            // Place the placeholder on top
+            // Control its visibility using opacity
+            placeholder()
+                .opacity(shouldShow ? 1 : 0) // Fade in/out
+                .animation(.easeInOut(duration: 0.15), value: shouldShow) // Add subtle animation
         }
     }
 }
+// --- END UPDATED Placeholder View Extension ---
+
 
 #Preview {
     let settings = SettingsModel()
     let ocr = OCRManager()
     let sub = SubscriptionManager.shared
-    // settings.extractedText = String(repeating: "This is a long line of text for testing jumpiness. ", count: 50) // Sample long text
+    // settings.extractedText = "" // Ensure empty for previewing placeholder
 
     return TextTabView(selectedTab: .constant(.text), isEditingPastDictation: false)
         .environmentObject(settings)
