@@ -512,7 +512,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DictationEasy/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "自助默書易DictationEasy";
+				INFOPLIST_KEY_CFBundleDisplayName = DictationEasy;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSCameraUsageDescription = "DictationEasy needs camera access to take photos and extract text. DictationEasy 需要相機訪問權限以拍攝照片並提取文字。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "DictationEasy needs photo library access to scan images for text extraction. DictationEasy 需要照片庫訪問權限以掃描圖片進行文字提取。";
@@ -554,7 +554,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DictationEasy/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "自助默書易DictationEasy";
+				INFOPLIST_KEY_CFBundleDisplayName = DictationEasy;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSCameraUsageDescription = "DictationEasy needs camera access to take photos and extract text. DictationEasy 需要相機訪問權限以拍攝照片並提取文字。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "DictationEasy needs photo library access to scan images for text extraction. DictationEasy 需要照片庫訪問權限以掃描圖片進行文字提取。";
