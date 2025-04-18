@@ -10,6 +10,7 @@ class TTSManager: NSObject, ObservableObject, TTSManagerProtocol {
     @Published var isPlaying: Bool = false
     @Published var error: String?
     var onSpeechCompletion: (() -> Void)?
+    private var voiceAvailabilityCache: [String: Bool] = [:] // Cache for voice availability
 
     override init() {
         super.init()
@@ -112,11 +113,20 @@ class TTSManager: NSObject, ObservableObject, TTSManagerProtocol {
         }
     }
 
-    // Check voice availability
+    // Check voice availability with caching
     func isVoiceAvailable(for language: AudioLanguage) -> Bool {
+        let key = language.voiceIdentifier
+        if let cachedResult = voiceAvailabilityCache[key] {
+            #if DEBUG
+            print("TTSManager.isVoiceAvailable: Language \(language.rawValue) (\(language.voiceIdentifier)) - Cached: \(cachedResult)")
+            #endif
+            return cachedResult
+        }
+
         let isAvailable = AVSpeechSynthesisVoice(language: language.voiceIdentifier) != nil
+        voiceAvailabilityCache[key] = isAvailable
         #if DEBUG
-        print("TTSManager.isVoiceAvailable: Language \(language.rawValue) (\(language.voiceIdentifier)) - Available: \(isAvailable)")
+        print("TTSManager.isVoiceAvailable: Language \(language.rawValue) (\(language.voiceIdentifier)) - Checked: \(isAvailable)")
         #endif
         return isAvailable
     }
