@@ -55,6 +55,7 @@ struct SettingsTabView: View {
     @State private var showEmailError = false
     @State private var feedbackText = ""
     @State private var showSubscriptionDetails = false
+    @State private var isPastDictationsEmpty = true // Cache empty state
     
     private var appVersion: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
@@ -97,10 +98,10 @@ struct SettingsTabView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(settings.pastDictations.isEmpty ? Color.gray : Color.red)
+                            .background(isPastDictationsEmpty ? Color.gray : Color.red)
                             .cornerRadius(10)
                     }
-                    .disabled(settings.pastDictations.isEmpty)
+                    .disabled(isPastDictationsEmpty)
                     .accessibilityLabel("Delete All Past Dictations Button 刪除所有過去文章按鈕")
                 } header: {
                     Text("Data Management 數據管理")
@@ -181,6 +182,7 @@ struct SettingsTabView: View {
             .alert("Delete All Past Dictations 刪除所有過去文章", isPresented: $showDeleteConfirmation) {
                 Button("Delete 刪除", role: .destructive) {
                     settings.deleteAllPastDictations()
+                    isPastDictationsEmpty = true // Update cache
                 }
                 Button("Cancel 取消", role: .cancel) { }
             } message: {
@@ -214,6 +216,12 @@ struct SettingsTabView: View {
                 if newError != nil {
                     showSettingsError = true
                 }
+            }
+            .onAppear {
+                isPastDictationsEmpty = settings.pastDictations.isEmpty // Initialize cache
+            }
+            .onChange(of: settings.pastDictations) { newDictations in
+                isPastDictationsEmpty = newDictations.isEmpty // Sync cache
             }
         }
     }

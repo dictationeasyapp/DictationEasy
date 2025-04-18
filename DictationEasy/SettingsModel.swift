@@ -71,7 +71,7 @@ enum AudioLanguage: String, CaseIterable {
     }
 }
 
-struct DictationEntry: Identifiable, Codable {
+struct DictationEntry: Identifiable, Codable, Equatable {
     let id: UUID
     let date: Date
     let text: String
@@ -80,6 +80,13 @@ struct DictationEntry: Identifiable, Codable {
         self.id = id
         self.date = date
         self.text = text
+    }
+
+    // Equatable conformance
+    static func == (lhs: DictationEntry, rhs: DictationEntry) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.date == rhs.date &&
+               lhs.text == rhs.text
     }
 }
 
@@ -109,20 +116,19 @@ class SettingsModel: ObservableObject {
         return appSupportURL.appendingPathComponent("pastDictations.json")
     }()
     private let fontSizeKey = "FontSize"
-    private var hasLoadedDictations = false // New flag for lazy loading
+    private static var hasLoadedDictations = false // Static flag for single load
 
     init() {
         self.fontSize = UserDefaults.standard.object(forKey: fontSizeKey) as? CGFloat ?? 16
         print("SettingsModel: Initialized, pastDictationsFileURL: \(pastDictationsFileURL)")
-        // Removed loadPastDictations() for lazy loading
     }
 
     func loadPastDictationsIfNeeded() {
-        guard !hasLoadedDictations else {
+        guard !SettingsModel.hasLoadedDictations else {
             print("SettingsModel: Past dictations already loaded, skipping")
             return
         }
-        hasLoadedDictations = true
+        SettingsModel.hasLoadedDictations = true
         print("SettingsModel: loadPastDictationsIfNeeded executing")
         loadPastDictations()
     }

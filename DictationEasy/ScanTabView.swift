@@ -30,6 +30,7 @@ struct ScanTabView: View {
     @State private var showUpgradePrompt = false
     @State private var showSubscriptionView = false
     @State private var selectedScanLanguage: ScanLanguage = .english
+    @State private var dictations: [DictationEntry] = [] // Cache for pastDictations
 
     // State for Delete Confirmation
     @State private var entryToDelete: DictationEntry? = nil
@@ -72,20 +73,23 @@ struct ScanTabView: View {
                 // --- Past Dictations Section (Using List) ---
                 Section {
                     List {
-                        if settings.pastDictations.isEmpty {
+                        if dictations.isEmpty {
                             Text("No past dictations 沒有過去文章")
                                 .foregroundColor(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .listRowBackground(Color.clear)
                         } else {
-                            ForEach(settings.pastDictations) { entry in
+                            ForEach(dictations) { entry in
                                 dictationEntryRow(entry) // Use ViewBuilder function
                             }
                         }
                     }
                     .listStyle(.plain)
                     .frame(maxHeight: .infinity) // Allow list to take available space
-                    .onAppear { settings.loadPastDictationsIfNeeded() } // Added for lazy loading
+                    .onAppear {
+                        settings.loadPastDictationsIfNeeded()
+                        dictations = settings.pastDictations // Update cache after loading
+                    }
                 } header: {
                     Text("Past Dictation 過去文章")
                         .font(.headline)
@@ -115,6 +119,7 @@ struct ScanTabView: View {
                    message: { entryData in alertMessageDeleteEntry(entryData: entryData) }
             // --- End Alerts ---
             .onChange(of: settings.error) { newError in showSettingsError = (newError != nil) }
+            .onChange(of: settings.pastDictations) { newDictations in dictations = newDictations } // Sync cache
             .onAppear {
                 if selectedImage != nil || selectedItem != nil {
                     selectedImage = nil; selectedItem = nil
@@ -129,7 +134,6 @@ struct ScanTabView: View {
 
     // MARK: - Subviews (Computed Properties)
 
-    // --- **** RESTORED IMPLEMENTATIONS **** ---
     private var languagePickerSection: some View {
         VStack(alignment: .leading) {
             Text("Scan Language 掃描語言").font(.headline).padding(.horizontal)
@@ -250,9 +254,8 @@ struct ScanTabView: View {
         }
         .background(Color(.systemBackground))
     }
-    // --- **** END RESTORED IMPLEMENTATIONS **** ---
 
-    // MARK: - Alert Components (Restored Implementations)
+    // MARK: - Alert Components
     @ViewBuilder private func alertButtonsGoToSettings() -> some View {
          Button("Go to Settings 前往設置") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
          Button("Cancel 取消", role: .cancel) {}
@@ -277,13 +280,12 @@ struct ScanTabView: View {
     private func alertMessageLimitedPhotoAccess() -> some View { Text("You have limited photo access...") }
     private func alertMessageCameraDenied() -> some View { Text("Please enable camera access...") }
     private func alertMessageCameraUnavailable() -> some View { Text("The camera is not available...") }
-    private func alertMessageUpgrade() -> some View { Text("Unlock unlimited past dictation storageand more with a Premium subscription!\n通過高級訂閱解鎖無限過去文章存儲等功能！") }
+    private func alertMessageUpgrade() -> some View { Text("Unlock unlimited past dictation storage and more with a Premium subscription!\n通過高級訂閱解鎖無限過去文章存儲等功能！") }
     private func alertMessageDeleteEntry(entryData: DictationEntry) -> some View {
         Text("Are you sure you want to delete this entry dated \(entryData.date.formatted(date: .numeric, time: .omitted))?\n您確定要刪除此日期為 \(entryData.date.formatted(date: .numeric, time: .omitted)) 的條目嗎？")
     }
-    // --- **** END RESTORED ALERT COMPONENTS **** ---
 
-    // MARK: - Permission & Processing Logic (Restored Implementations)
+    // MARK: - Permission & Processing Logic
     private func checkPhotoLibraryPermission() {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         switch status {
@@ -351,7 +353,6 @@ struct ScanTabView: View {
             print("processImage: Reset selectedItem and selectedImage.")
         }
     }
-    // --- **** END RESTORED FUNCTIONS **** ---
 
     #else // Fallback for non-UIKit platforms
     // Fallback Body
@@ -362,9 +363,8 @@ struct ScanTabView: View {
         }
     }
     #endif // End #if canImport(UIKit)
-} // End struct ScanTabView
+}
 
-// Preview needs adjustments if not on iOS or missing dependencies
 #if canImport(UIKit)
 #Preview {
     // --- Create instances needed for the view ---
