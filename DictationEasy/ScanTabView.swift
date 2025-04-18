@@ -16,6 +16,7 @@ struct ScanTabView: View {
     @EnvironmentObject var subscriptionManager: SubscriptionManager
     let onNavigateToText: (Bool) -> Void
 
+    // States for UI control
     @State private var selectedItem: PhotosPickerItem?
     @State private var selectedImage: UIImage?
     @State private var showError = false
@@ -30,456 +31,372 @@ struct ScanTabView: View {
     @State private var showSubscriptionView = false
     @State private var selectedScanLanguage: ScanLanguage = .english
 
+    // State for Delete Confirmation
+    @State private var entryToDelete: DictationEntry? = nil
+
+
     var isFreeUser: Bool {
         return !subscriptionManager.isPremium
     }
 
+    // ScanLanguage Enum
     enum ScanLanguage: String, CaseIterable, Identifiable {
         case english = "English英文"
         case chinese = "Chinese中文"
-
         var id: String { self.rawValue }
-
         var visionLanguageCode: String {
             switch self {
-            case .english:
-                return "en-US"
-            case .chinese:
-                return "zh-Hans" // Consider zh-Hant for Traditional if needed
+            case .english: return "en-US"
+            case .chinese: return "zh-Hans"
             }
         }
     }
 
     var body: some View {
         NavigationView {
-            GeometryReader { geometry in
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // Language Selection Picker
-                        VStack(alignment: .leading) {
-                            Text("Scan Language 掃描語言")
-                                .font(.headline)
-                                .padding(.horizontal)
-                            Picker("Language 語言", selection: $selectedScanLanguage) {
-                                ForEach(ScanLanguage.allCases) { language in
-                                    Text(language.rawValue).tag(language)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            .padding(.horizontal)
-                        }
+            // Use VStack as the main container
+            VStack(spacing: 0) {
+                languagePickerSection // Extracted
+                    .padding(.vertical)
 
-                        // Photo Selection and Camera Buttons
-                        HStack(spacing: 20) {
-                            PhotosPicker(selection: $selectedItem, matching: .images) {
-                                Label("Select Image 選擇圖片", systemImage: "photo")
-                                    .font(.title2)
-                                    .padding()
-                                    .background(Color.blue)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(10)
-                            }
-                            .onTapGesture {
-                                // Resign focus before showing picker if needed,
-                                // though PhotosPicker is generally less problematic than camera
-                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { // Shorter delay might be okay
-                                    checkPhotoLibraryPermission()
-                                }
-                            }
-                            .onChange(of: selectedItem) { newItem in
-                                if let newItem = newItem {
-                                    Task {
-                                        if let data = try? await newItem.loadTransferable(type: Data.self),
-                                           let image = UIImage(data: data) {
-                                            selectedImage = image
-                                        } else {
-                                            errorMessage = "Failed to load image 無法加載圖片"
-                                            showError = true
-                                        }
-                                    }
-                                } else {
-                                    selectedImage = nil
-                                }
-                            }
+                photoAndCameraButtons // Extracted
 
-                            // --- UPDATED CAMERA BUTTON ACTION ---
-                            Button(action: {
-                                // Dismiss the keyboard first
-                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                // --- Image Preview & Action Buttons (Conditional) ---
+                 VStack { // Group these related items
+                     if let image = selectedImage {
+                         imagePreviewSection(image: image)
+                         actionButtonsSection
+                     }
+                 }
+                 .padding(.top, selectedImage != nil ? 10 : 0) // Add space only if image is shown
 
-                                // Add a small delay to allow the keyboard to fully dismiss
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                    checkCameraPermission()
-                                }
-                            }) {
-                                Label("Take Photo 拍照", systemImage: "camera")
-                                    .font(.title2)
-                                    .padding()
-                                    .background(Color.blue)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(10)
-                            }
-                            // --- END UPDATED CAMERA BUTTON ACTION ---
-                        }
-                        .padding(.horizontal) // Added padding for better spacing
 
-                        if let image = selectedImage {
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(height: 200)
-                                .cornerRadius(10)
-                                .padding(.horizontal) // Added padding
-                            Text("Scanning in \(selectedScanLanguage.rawValue) 以\(selectedScanLanguage.rawValue == "English英文" ? "英文" : "中文")掃描")
-                                .font(.caption)
+                // --- Past Dictations Section (Using List) ---
+                Section {
+                    List {
+                        if settings.pastDictations.isEmpty {
+                            Text("No past dictations 沒有過去文章")
                                 .foregroundColor(.secondary)
-                        }
-
-                        if selectedImage != nil {
-                            HStack(spacing: 20) {
-                                Button(action: {
-                                    selectedItem = nil
-                                    selectedImage = nil
-                                }) {
-                                    Label("Cancel 取消", systemImage: "xmark")
-                                        .font(.headline)
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                        .background(Color.red)
-                                        .cornerRadius(10)
-                                }
-
-                                Button(action: {
-                                    processImage()
-                                }) {
-                                    Label("Extract Text 提取文字", systemImage: "text.viewfinder")
-                                        .font(.headline)
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                        .background(Color.blue)
-                                        .cornerRadius(10)
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-
-                        // Past Dictations Section
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Past Dictation 過去文章")
-                                .font(.headline)
-                                .padding(.horizontal)
-
-                            if settings.pastDictations.isEmpty {
-                                Text("No past dictations 沒有過去文章")
-                                    .foregroundColor(.secondary)
-                                    .padding()
-                                    .frame(maxWidth: .infinity, alignment: .center) // Center if empty
-                            } else {
-                                ForEach(settings.pastDictations) { entry in
-                                    Button(action: {
-                                        if subscriptionManager.isPremium {
-                                            settings.editingDictationId = entry.id
-                                            settings.extractedText = entry.text
-                                            isEditingPastDictation = true
-                                            onNavigateToText(true)
-                                            #if DEBUG
-                                            print("ScanTabView - Selected entry for editing: \(entry.id)")
-                                            print("ScanTabView - Set editingDictationId: \(String(describing: settings.editingDictationId))")
-                                            #endif
-                                        } else {
-                                            showUpgradePrompt = true
-                                        }
-                                    }) {
-                                        HStack {
-                                            VStack(alignment: .leading, spacing: 5) {
-                                                Text(entry.date, style: .date)
-                                                    .font(.subheadline)
-                                                    .foregroundColor(.primary)
-                                                let sentences = entry.text.splitIntoSentences()
-                                                let preview = sentences.isEmpty ? String(entry.text.prefix(50)) : sentences[0]
-                                                Text(preview.count > 50 ? String(preview.prefix(50)) + "..." : preview)
-                                                    .font(.body)
-                                                    .foregroundColor(.secondary)
-                                                    .lineLimit(2)
-                                            }
-                                            Spacer()
-                                            Image(systemName: "chevron.right")
-                                                .foregroundColor(.secondary)
-                                        }
-                                        .padding()
-                                        .background(Color(.secondarySystemGroupedBackground)) // Subtle background
-                                        .cornerRadius(10)
-                                        .shadow(color: .gray.opacity(0.1), radius: 1, x: 0, y: 1) // Softer shadow
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) { // Prevent full swipe delete
-                                        if subscriptionManager.isPremium {
-                                            Button(role: .destructive) {
-                                                settings.deletePastDictation(id: entry.id)
-                                            } label: {
-                                                Label("Delete", systemImage: "trash")
-                                            }
-                                        } else {
-                                             // Optionally show upgrade prompt on swipe delete for free users
-                                             Button {
-                                                 showUpgradePrompt = true
-                                             } label: {
-                                                 Label("Upgrade", systemImage: "lock")
-                                             }
-                                             .tint(.orange)
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .listRowBackground(Color.clear)
+                        } else {
+                            ForEach(settings.pastDictations) { entry in
+                                dictationEntryRow(entry) // Use ViewBuilder function
                             }
                         }
-                        .padding(.top) // Add some space above the section
+                    }
+                    .listStyle(.plain)
+                    // Add explicit background if needed with plain style
+                    // .background(Color(.systemGroupedBackground))
+                    .frame(maxHeight: .infinity) // Allow list to take available space
 
-                        Spacer() // Pushes content up
-
-                    } // End Main VStack
-                    .padding(.vertical) // Add padding top/bottom of scroll content
-                    .frame(minHeight: geometry.size.height - geometry.safeAreaInsets.top - geometry.safeAreaInsets.bottom) // Adjust minHeight for safe area
-                } // End ScrollView
-                .safeAreaInset(edge: .bottom) { // Place banner ad outside scrollview but respecting safe area
-                     bannerAdSection
-                         .padding(.bottom, geometry.safeAreaInsets.bottom > 0 ? 0 : 10) // Add padding only if no safe area
+                } header: {
+                    Text("Past Dictation 過去文章")
+                        .font(.headline)
+                        .padding(.horizontal)
+                        .padding(.top) // Add space above the list header
                 }
-                .ignoresSafeArea(.keyboard, edges: .bottom) // Ignore keyboard inset
-            } // End GeometryReader
-            .background(Color(.systemGroupedBackground)) // Use system background
+                // --- End Past Dictations Section ---
+
+
+                // Banner Ad at the bottom
+                bannerAdSection
+
+            } // End Main VStack
+            .background(Color(.systemGroupedBackground).ignoresSafeArea(.all, edges: .all))
             .navigationTitle("Scan 掃描")
-            .sheet(isPresented: $showCamera) {
-                ImagePicker(selectedImage: $selectedImage, sourceType: .camera)
-                    .ignoresSafeArea() // Allow camera to use full screen
-            }
-            .sheet(isPresented: $showSubscriptionView) {
-                SubscriptionView()
-                    .environmentObject(subscriptionManager)
-                    .environmentObject(settings) // Pass necessary environment objects
-            }
-            .alert("Photo Library Access Denied 無法訪問照片庫", isPresented: $showPermissionAlert) {
-                Button("Go to Settings 前往設置", role: .none) {
-                    if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(settingsURL)
-                    }
-                }
-                Button("Cancel 取消", role: .cancel) { }
-            } message: {
-                Text("Please grant photo library access in Settings to scan images.\n請在設置中授予照片庫訪問權限以掃描圖片。")
-            }
-            .alert("Limited Photo Access 照片訪問受限", isPresented: $showLimitedAccessMessage) {
-                Button("Select More Photos 選擇更多照片", role: .none) {
-                    if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(settingsURL)
-                    }
-                }
-                Button("Continue 繼續", role: .cancel) { }
-            } message: {
-                Text("You have limited photo access. Select more photos to scan, or continue with the current selection.\n您已限制照片訪問。選擇更多照片進行掃描，或繼續使用當前選擇。")
-            }
-            .alert("Camera Access Denied 相機訪問被拒絕", isPresented: $showCameraPermissionAlert) {
-                Button("Go to Settings 前往設置", role: .none) {
-                    if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(settingsURL)
-                    }
-                }
-                Button("Cancel 取消", role: .cancel) { }
-            } message: {
-                Text("Please enable camera access in Settings to take photos.\n請在設置中啟用相機訪問以拍攝照片。")
-            }
-            .alert("Camera Unavailable 相機不可用", isPresented: $showCameraUnavailableAlert) {
-                Button("OK 確定", role: .cancel) { }
-            } message: {
-                Text("The camera is not available on this device.\n該設備上相機不可用。")
-            }
-            .alert("Error 錯誤", isPresented: $showError) {
-                Button("OK 確定", role: .cancel) { }
-            } message: {
-                Text(errorMessage)
-            }
-            .alert("Settings Error 設置錯誤", isPresented: $showSettingsError) {
-                Button("OK 確定", role: .cancel) {
-                    settings.error = nil
-                }
-            } message: {
-                Text(settings.error ?? "Unknown error 未知錯誤")
-            }
-            .alert("Upgrade to Premium 升級到高級版", isPresented: $showUpgradePrompt) {
-                Button("Upgrade 升級", role: .none) {
-                    showSubscriptionView = true
-                }
-                Button("Cancel 取消", role: .cancel) { }
-            } message: {
-                Text("Unlock unlimited past dictation storage and more with a Premium subscription!\n通過高級訂閱解鎖無限過去文章存儲等功能！")
-            }
-            .onChange(of: settings.error) { newError in
-                if newError != nil {
-                    showSettingsError = true
-                }
-            }
+            .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showCamera) { ImagePicker(selectedImage: $selectedImage, sourceType: .camera).ignoresSafeArea() }
+            .sheet(isPresented: $showSubscriptionView) { SubscriptionView().environmentObject(subscriptionManager).environmentObject(settings) }
+            // --- Alerts ---
+            .alert("Photo Library Access Denied 無法訪問照片庫", isPresented: $showPermissionAlert) { alertButtonsGoToSettings() } message: { alertMessagePhotoLibraryDenied() }
+            .alert("Limited Photo Access 照片訪問受限", isPresented: $showLimitedAccessMessage) { alertButtonsLimitedPhotoAccess() } message: { alertMessageLimitedPhotoAccess() }
+            .alert("Camera Access Denied 相機訪問被拒絕", isPresented: $showCameraPermissionAlert) { alertButtonsGoToSettings() } message: { alertMessageCameraDenied() }
+            .alert("Camera Unavailable 相機不可用", isPresented: $showCameraUnavailableAlert) { alertButtonsOk() } message: { alertMessageCameraUnavailable() }
+            .alert("Error 錯誤", isPresented: $showError) { alertButtonsOk() } message: { Text(errorMessage) }
+            .alert("Settings Error 設置錯誤", isPresented: $showSettingsError) { alertButtonsOk { settings.error = nil } } message: { Text(settings.error ?? "Unknown error") }
+            .alert("Upgrade to Premium 升級到高級版", isPresented: $showUpgradePrompt) { alertButtonsUpgrade() } message: { alertMessageUpgrade() }
+            .alert("Delete Dictation Entry?", isPresented: .constant(entryToDelete != nil), presenting: entryToDelete)
+                   { entryData in alertButtonsDeleteEntry(entryData: entryData) }
+                   message: { entryData in alertMessageDeleteEntry(entryData: entryData) }
+            // --- End Alerts ---
+            .onChange(of: settings.error) { newError in showSettingsError = (newError != nil) }
             .onAppear {
-                // Reset selection state when the tab appears
                 if selectedImage != nil || selectedItem != nil {
-                    selectedImage = nil
-                    selectedItem = nil
+                    selectedImage = nil; selectedItem = nil
                     #if DEBUG
                     print("ScanTabView - onAppear: Reset selectedImage and selectedItem")
                     #endif
                 }
             }
         } // End NavigationView
-        .navigationViewStyle(.stack) // Use stack style for consistency
+        .navigationViewStyle(.stack)
+    } // End body
+
+
+    // MARK: - Subviews (Computed Properties)
+
+    // --- **** RESTORED IMPLEMENTATIONS **** ---
+    private var languagePickerSection: some View {
+        VStack(alignment: .leading) {
+            Text("Scan Language 掃描語言").font(.headline).padding(.horizontal)
+            Picker("Language 語言", selection: $selectedScanLanguage) {
+                ForEach(ScanLanguage.allCases) { language in Text(language.rawValue).tag(language) }
+            }.pickerStyle(.segmented).padding(.horizontal)
+        }
+    }
+
+    private var photoAndCameraButtons: some View {
+        HStack(spacing: 20) {
+            PhotosPicker(selection: $selectedItem, matching: .images) {
+                Label("Select Image 選擇圖片", systemImage: "photo")
+                   .font(.body).padding().frame(maxWidth: .infinity)
+                   .background(Color.blue).foregroundColor(.white).cornerRadius(10)
+            }
+            .onTapGesture {
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { checkPhotoLibraryPermission() }
+            }
+            .onChange(of: selectedItem) { newItem in
+                Task {
+                   if let data = try? await newItem?.loadTransferable(type: Data.self), let image = UIImage(data: data) {
+                        selectedImage = image
+                   } else if newItem != nil {
+                       errorMessage = "Failed to load image 無法加載圖片"; showError = true
+                   } else {
+                       selectedImage = nil
+                   }
+                }
+            }
+
+            Button(action: {
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { checkCameraPermission() }
+            }) {
+                Label("Take Photo 拍照", systemImage: "camera")
+                   .font(.body).padding().frame(maxWidth: .infinity)
+                   .background(Color.blue).foregroundColor(.white).cornerRadius(10)
+            }
+        }.padding(.horizontal)
+    }
+
+    private func imagePreviewSection(image: UIImage) -> some View {
+        VStack {
+            Image(uiImage: image)
+                 .resizable().scaledToFit().frame(height: 150)
+                 .cornerRadius(10).padding(.horizontal).padding(.top)
+             Text("Scanning in \(selectedScanLanguage.rawValue) 以\(selectedScanLanguage.rawValue == "English英文" ? "英文" : "中文")掃描")
+                 .font(.caption).foregroundColor(.secondary)
+        }
+    }
+
+    private var actionButtonsSection: some View {
+         HStack(spacing: 20) {
+             Button(action: { selectedItem = nil; selectedImage = nil }) {
+                 Label("Cancel", systemImage: "xmark")
+                     .font(.body).foregroundColor(.white).frame(maxWidth: .infinity).padding()
+                     .background(Color.red).cornerRadius(10)
+             }
+             Button(action: { processImage() }) {
+                 Label("Extract Text", systemImage: "text.viewfinder")
+                    .font(.body).foregroundColor(.white).frame(maxWidth: .infinity).padding()
+                    .background(Color.blue).cornerRadius(10)
+             }
+         }.padding(.horizontal).padding(.bottom) // Add bottom padding
+    }
+
+    // NOTE: pastDictationsListSection was integrated into the main body with List
+
+    // Helper View Builder for individual dictation row
+    @ViewBuilder
+    private func dictationEntryRow(_ entry: DictationEntry) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(entry.date, style: .date).font(.subheadline).foregroundColor(.primary)
+                let sentences = entry.text.splitIntoSentences()
+                let preview = sentences.isEmpty ? String(entry.text.prefix(50)) : sentences[0]
+                Text(preview.count > 50 ? String(preview.prefix(50)) + "..." : preview)
+                    .font(.body).foregroundColor(.secondary).lineLimit(2)
+            }
+            Spacer()
+            Image(systemName: "chevron.right").foregroundColor(.secondary)
+        }
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if subscriptionManager.isPremium {
+                settings.editingDictationId = entry.id
+                settings.extractedText = entry.text
+                isEditingPastDictation = true
+                onNavigateToText(true)
+                #if DEBUG
+                print("ScanTabView - Tapped entry for editing: \(entry.id)")
+                #endif
+            } else {
+                showUpgradePrompt = true
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            if subscriptionManager.isPremium {
+                Button(role: .destructive) { entryToDelete = entry } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            } else {
+                 Button { showUpgradePrompt = true } label: {
+                     Label("Upgrade", systemImage: "lock")
+                 }.tint(.orange)
+            }
+        }
     }
 
     private var bannerAdSection: some View {
-        VStack { // Use VStack to manage padding/background if needed
+        VStack {
             if isFreeUser {
-                BannerAdContainer()
-                    .frame(height: 50) // Standard banner height
-                    .frame(maxWidth: .infinity) // Ensure it takes full width
+                BannerAdContainer().frame(height: 50).frame(maxWidth: .infinity)
             } else {
-                EmptyView() // Takes no space if premium
+                EmptyView()
             }
         }
-        .background(Color(.systemBackground)) // Match background if needed
+        .background(Color(.systemBackground))
+    }
+    // --- **** END RESTORED IMPLEMENTATIONS **** ---
+
+
+    // MARK: - Alert Components (Restored Implementations)
+    @ViewBuilder private func alertButtonsGoToSettings() -> some View {
+         Button("Go to Settings 前往設置") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
+         Button("Cancel 取消", role: .cancel) {}
+    }
+    @ViewBuilder private func alertButtonsLimitedPhotoAccess() -> some View {
+         Button("Select More Photos 選擇更多照片") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
+         Button("Continue 繼續", role: .cancel) {}
+    }
+    @ViewBuilder private func alertButtonsOk(action: (() -> Void)? = nil) -> some View {
+        Button("OK 確定") { action?() }
+    }
+     @ViewBuilder private func alertButtonsUpgrade() -> some View {
+         Button("Upgrade 升級") { showSubscriptionView = true }
+         Button("Cancel 取消", role: .cancel) {}
+    }
+    @ViewBuilder private func alertButtonsDeleteEntry(entryData: DictationEntry) -> some View {
+        Button("Delete 刪除", role: .destructive) { settings.deletePastDictation(id: entryData.id); entryToDelete = nil }
+        Button("Cancel 取消", role: .cancel) { entryToDelete = nil }
     }
 
+    private func alertMessagePhotoLibraryDenied() -> some View { Text("Please grant photo library access...") }
+    private func alertMessageLimitedPhotoAccess() -> some View { Text("You have limited photo access...") }
+    private func alertMessageCameraDenied() -> some View { Text("Please enable camera access...") }
+    private func alertMessageCameraUnavailable() -> some View { Text("The camera is not available...") }
+    private func alertMessageUpgrade() -> some View { Text("Unlock unlimited past dictation storage...") }
+    private func alertMessageDeleteEntry(entryData: DictationEntry) -> some View {
+        Text("Are you sure you want to delete this entry dated \(entryData.date.formatted(date: .numeric, time: .omitted))?\n您確定要刪除此日期為 \(entryData.date.formatted(date: .numeric, time: .omitted)) 的條目嗎？")
+    }
+    // --- **** END RESTORED ALERT COMPONENTS **** ---
+
+
+    // MARK: - Permission & Processing Logic (Restored Implementations)
     private func checkPhotoLibraryPermission() {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         switch status {
-        case .authorized:
-            print("Photo Library: Authorized")
-            showLimitedAccessMessage = false // Ensure this is reset
-        case .limited:
-            print("Photo Library: Limited")
-            showLimitedAccessMessage = true
-        case .denied, .restricted:
-            print("Photo Library: Denied or Restricted")
-            showPermissionAlert = true
+        case .authorized: print("Photo Library: Authorized"); showLimitedAccessMessage = false
+        case .limited: print("Photo Library: Limited"); showLimitedAccessMessage = true
+        case .denied, .restricted: print("Photo Library: Denied or Restricted"); showPermissionAlert = true
         case .notDetermined:
             print("Photo Library: Not Determined, requesting...")
             PHPhotoLibrary.requestAuthorization(for: .readWrite) { newStatus in
                 DispatchQueue.main.async {
                     print("Photo Library: Permission result - \(newStatus.rawValue)")
                     switch newStatus {
-                    case .authorized:
-                        showLimitedAccessMessage = false
-                    case .limited:
-                        showLimitedAccessMessage = true
-                    case .denied, .restricted:
-                        showPermissionAlert = true
-                    default: // Should cover .notDetermined again (unlikely) & @unknown
-                        showPermissionAlert = true
+                    case .authorized: showLimitedAccessMessage = false
+                    case .limited: showLimitedAccessMessage = true
+                    case .denied, .restricted: showPermissionAlert = true
+                    default: showPermissionAlert = true
                     }
                 }
             }
-        @unknown default:
-            print("Photo Library: Unknown status")
-            showPermissionAlert = true
+        @unknown default: print("Photo Library: Unknown status"); showPermissionAlert = true
         }
     }
 
-    // --- UPDATED checkCameraPermission ---
     private func checkCameraPermission() {
         guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
-            print("Camera: Not available on this device.")
-            showCameraUnavailableAlert = true
-            return
+            print("Camera: Not available on this device."); showCameraUnavailableAlert = true; return
         }
-
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         switch status {
-        case .authorized:
-            print("Camera: Authorized")
-            // Ensure UI update happens on main thread
-            DispatchQueue.main.async {
-                self.showCamera = true
-            }
-        case .denied, .restricted:
-            print("Camera: Denied or Restricted")
-            showCameraPermissionAlert = true
+        case .authorized: print("Camera: Authorized"); DispatchQueue.main.async { self.showCamera = true }
+        case .denied, .restricted: print("Camera: Denied or Restricted"); showCameraPermissionAlert = true
         case .notDetermined:
             print("Camera: Not Determined, requesting...")
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 DispatchQueue.main.async {
                     print("Camera: Permission result - \(granted)")
-                    if granted {
-                        self.showCamera = true
-                    } else {
-                        self.showCameraPermissionAlert = true
-                    }
+                    if granted { self.showCamera = true } else { self.showCameraPermissionAlert = true }
                 }
             }
-        @unknown default:
-            print("Camera: Unknown status")
-            showCameraPermissionAlert = true
+        @unknown default: print("Camera: Unknown status"); showCameraPermissionAlert = true
         }
     }
-    // --- END UPDATED checkCameraPermission ---
 
     private func processImage() {
-        guard let image = selectedImage else {
-             print("processImage: No image selected.")
-             return
-        }
-        // Optionally resign focus before starting processing
+        guard let image = selectedImage else { print("processImage: No image selected."); return }
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         print("processImage: Starting OCR for language \(selectedScanLanguage.visionLanguageCode)")
         Task {
             do {
                 try await ocrManager.processImage(image, scanLanguage: selectedScanLanguage)
-                // Check OCRManager's error property AFTER the async call completes
                 if let ocrError = ocrManager.error {
                      print("processImage: OCR failed with error: \(ocrError)")
                      throw NSError(domain: "OCRManagerError", code: -1, userInfo: [NSLocalizedDescriptionKey: ocrError])
                 }
                 print("processImage: OCR successful. Text length: \(ocrManager.extractedText.count)")
-                // Update SettingsModel and navigate
                 settings.extractedText = ocrManager.extractedText
-                settings.savePastDictation(text: settings.extractedText) // Save the new entry
-                isEditingPastDictation = false // Ensure we are not in editing mode
-                onNavigateToText(true) // Navigate programmatically
+                settings.savePastDictation(text: settings.extractedText)
+                isEditingPastDictation = false
+                onNavigateToText(true)
             } catch {
                 print("processImage: Catch block error: \(error.localizedDescription)")
-                errorMessage = error.localizedDescription
-                showError = true
+                errorMessage = error.localizedDescription; showError = true
             }
-            // Reset image selection regardless of success/failure
-            selectedItem = nil
-            selectedImage = nil
-             print("processImage: Reset selectedItem and selectedImage.")
+            selectedItem = nil; selectedImage = nil
+            print("processImage: Reset selectedItem and selectedImage.")
         }
     }
+    // --- **** END RESTORED FUNCTIONS **** ---
+
 
     #else // Fallback for non-UIKit platforms
+    // Fallback Body
     var body: some View {
         NavigationView {
             Text("Scan feature is only available on iOS devices.\n掃描功能僅在 iOS 設備上可用。")
-                .padding()
-                .multilineTextAlignment(.center)
-                .navigationTitle("Scan 掃描")
+                .padding().multilineTextAlignment(.center).navigationTitle("Scan 掃描")
         }
     }
-    #endif
-}
+    #endif // End #if canImport(UIKit)
+} // End struct ScanTabView
+
 
 // Preview needs adjustments if not on iOS or missing dependencies
 #if canImport(UIKit)
 #Preview {
-    // Create mock environment objects for preview
+    // --- Create instances needed for the view ---
     let settings = SettingsModel()
     let ocr = OCRManager()
-    let subManager = SubscriptionManager.shared // Use shared instance for preview consistency
+    let subManager = SubscriptionManager.shared
+
+    // --- Conditionally set up mock data for preview ---
+    #if DEBUG
     settings.pastDictations = [ // Add sample data
          DictationEntry(text: "This is the first past dictation preview."),
          DictationEntry(text: "这是第二篇过去文章的预览。")
     ]
+    // subManager.isPremium = true // Uncomment to test premium swipe actions
+    print("Preview setup complete with mock data.")
+    #endif
 
-    return ScanTabView(
+    // --- Always return the main view ---
+    return ScanTabView( // Use explicit return
         selectedTab: .constant(.scan),
         isEditingPastDictation: .constant(false),
         onNavigateToText: { isProgrammatic in print("Navigate to Text: \(isProgrammatic)") }

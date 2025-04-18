@@ -16,78 +16,32 @@ struct SubscriptionView: View {
 
     var body: some View {
         NavigationStack {
+            // --- **** OUTER ZSTACK FOR LOADING OVERLAY **** ---
             ZStack {
-                Color(.systemGray6)
-                    .ignoresSafeArea()
+                // --- Original Content Logic ---
+                ZStack { // Inner ZStack for background color
+                    Color(.systemGray6)
+                        .ignoresSafeArea()
 
-                if subscriptionManager.isPremium {
-                    // --- Premium Confirmation View ---
-                    VStack(spacing: 20) {
-                        Text("Subscription Successful! 訂閱成功！")
-                            .font(.title).fontWeight(.bold).padding(.top, 20)
-
-                        // --- **** THIS IS THE ONLY CHANGE **** ---
-                        Text("You are now a Premium user. 您現在是高級用戶。")
-                            .font(.body)
-                            .foregroundColor(.primary) // CHANGED FROM .secondary TO .primary
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                        // --- **** END CHANGE **** ---
-
-                        Button(action: { navigateToDetails = true }) {
-                            Text("View Subscription Details 查看訂閱詳情")
-                                .font(.headline).foregroundColor(.white).frame(maxWidth: .infinity).padding()
-                                .background(Color.blue).cornerRadius(12).shadow(radius: 3)
-                        }.padding(.horizontal)
-                        Button(action: { dismiss() }) {
-                            Text("Back to App 返回應用")
-                                .font(.subheadline).foregroundColor(.blue).padding().frame(maxWidth: .infinity)
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.blue, lineWidth: 1))
-                        }.padding(.horizontal).padding(.bottom, 20)
+                    // Display content based on state
+                    if subscriptionManager.isPremium {
+                        premiumConfirmationView
+                    } else if showFallbackPaywall || selectedOffering == nil {
+                        FallbackPaywallView()
+                            .environmentObject(subscriptionManager)
+                    } else {
+                        revenueCatPaywallView
                     }
-                    .padding().background(Color.white).cornerRadius(15).shadow(radius: 5)
-                    .padding(.horizontal).onAppear { print("SubscriptionView: Showing confirmation because isPremium is true") }
-
-                } else if showFallbackPaywall || selectedOffering == nil {
-                    // --- Fallback Paywall ---
-                    FallbackPaywallView() // Initialize directly
-                        .environmentObject(subscriptionManager)
-                } else {
-                    // --- RevenueCat PaywallView ---
-                    PaywallView(offering: selectedOffering!, displayCloseButton: true)
-                        .onPurchaseCompleted { customerInfo in
-                            print("PaywallView: Purchase completed: \(customerInfo.entitlements)")
-                            subscriptionManager.updateStatus(with: customerInfo)
-                        }
-                        .onRestoreCompleted { customerInfo in
-                            print("PaywallView: Restore completed: \(customerInfo.entitlements)")
-                            subscriptionManager.updateStatus(with: customerInfo)
-                        }
-                        .onAppear { // Fetch offerings when PaywallView appears
-                            print("PaywallView: Fetching offerings")
-                            // Ensure Purchases SDK is configured before calling
-                            guard Purchases.isConfigured else {
-                                print("PaywallView: Purchases not configured. Cannot fetch offerings.")
-                                DispatchQueue.main.async { showFallbackPaywall = true }
-                                return
-                            }
-                            RevenueCat.Purchases.shared.getOfferings { offerings, error in
-                                if let error = error {
-                                    print("PaywallView: Error fetching offerings: \(error)")
-                                    DispatchQueue.main.async { showFallbackPaywall = true }
-                                    return
-                                }
-                                if let offering = offerings?.offering(identifier: "default") {
-                                    DispatchQueue.main.async { selectedOffering = offering }
-                                } else {
-                                    print("PaywallView: Default offering not found")
-                                    DispatchQueue.main.async { showFallbackPaywall = true }
-                                }
-                            }
-                        }
                 }
+                // --- End Original Content Logic ---
+
+                // --- **** LOADING OVERLAY (Conditionally Added) **** ---
+                if subscriptionManager.isLoading {
+                    loadingOverlay
+                }
+                // --- **** END LOADING OVERLAY **** ---
             }
-            .navigationBarHidden(true) // Hide nav bar if RCUI paywall shows its own controls
+            .navigationBarHidden(true) // Hide nav bar if RCUI paywall shows its own controls or for custom header
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(isPresented: $navigateToDetails) {
                 SubscriptionDetailsView()
@@ -106,10 +60,96 @@ struct SubscriptionView: View {
             subscriptionManager.checkSubscriptionStatus()
             subscriptionManager.fetchAvailablePackages()
         }
-    }
-}
+    } // End body
 
-// --- FallbackPaywallView Definition ---
+    // --- Extracted Subviews for Clarity ---
+
+    private var premiumConfirmationView: some View {
+        VStack(spacing: 20) {
+            Text("Subscription Successful! 訂閱成功！")
+                .font(.title).fontWeight(.bold).padding(.top, 20)
+            Text("You are now a Premium user. 您現在是高級用戶。")
+                .font(.body)
+                .foregroundColor(.primary) // Corrected color
+                .multilineTextAlignment(.center).padding(.horizontal)
+            Button(action: { navigateToDetails = true }) {
+                Text("View Subscription Details 查看訂閱詳情")
+                    .font(.headline).foregroundColor(.white).frame(maxWidth: .infinity).padding()
+                    .background(Color.blue).cornerRadius(12).shadow(radius: 3)
+            }.padding(.horizontal)
+            Button(action: { dismiss() }) {
+                Text("Back to App 返回應用")
+                    .font(.subheadline).foregroundColor(.blue).padding().frame(maxWidth: .infinity)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.blue, lineWidth: 1))
+            }.padding(.horizontal).padding(.bottom, 20)
+        }
+        .padding().background(Color.white).cornerRadius(15).shadow(radius: 5)
+        .padding(.horizontal).onAppear { print("SubscriptionView: Showing confirmation because isPremium is true") }
+    }
+
+    private var revenueCatPaywallView: some View {
+        PaywallView(offering: selectedOffering!, displayCloseButton: true)
+            .onPurchaseCompleted { customerInfo in
+                print("PaywallView: Purchase completed: \(customerInfo.entitlements)")
+                subscriptionManager.updateStatus(with: customerInfo)
+            }
+            .onRestoreCompleted { customerInfo in
+                print("PaywallView: Restore completed: \(customerInfo.entitlements)")
+                subscriptionManager.updateStatus(with: customerInfo)
+            }
+            .onAppear { // Fetch offerings when PaywallView appears
+                print("PaywallView: Fetching offerings")
+                guard Purchases.isConfigured else {
+                    print("PaywallView: Purchases not configured. Cannot fetch offerings.")
+                    DispatchQueue.main.async { showFallbackPaywall = true }
+                    return
+                }
+                RevenueCat.Purchases.shared.getOfferings { offerings, error in
+                    if let error = error {
+                        print("PaywallView: Error fetching offerings: \(error)")
+                        DispatchQueue.main.async { showFallbackPaywall = true }
+                        return
+                    }
+                    if let offering = offerings?.offering(identifier: "default") {
+                        DispatchQueue.main.async { selectedOffering = offering }
+                    } else {
+                        print("PaywallView: Default offering not found")
+                        DispatchQueue.main.async { showFallbackPaywall = true }
+                    }
+                }
+            }
+    }
+
+    // --- Loading Overlay View ---
+    private var loadingOverlay: some View {
+        ZStack {
+            // Semi-transparent background to dim content and block interaction
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                .allowsHitTesting(true) // Ensure it blocks taps
+
+            VStack(spacing: 15) {
+                ProgressView() // Standard spinner
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white)) // Make spinner white
+                    .scaleEffect(1.5) // Make spinner slightly larger
+
+                Text("Processing...\n正在處理...")
+                    .foregroundColor(.white)
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(30)
+            .background(.regularMaterial) // Use a material background for the box
+            .cornerRadius(15)
+            .shadow(radius: 5)
+        }
+        .zIndex(1) // Ensure overlay is on top
+    }
+
+} // End struct SubscriptionView
+
+
+// --- FallbackPaywallView Definition (Keep as is) ---
 struct FallbackPaywallView: View {
     @EnvironmentObject var subscriptionManager: SubscriptionManager
     @Environment(\.dismiss) private var dismiss
@@ -241,7 +281,9 @@ struct FeatureRow: View {
 #Preview {
      // Create a dummy manager for the preview, it won't have real packages
      let previewManager = SubscriptionManager.shared
-     // You could manually set isPremium for previewing the confirmation state:
+     // You could manually set isLoading for previewing the loading state:
+     // previewManager.isLoading = true
+     // Or set isPremium for previewing the confirmation state:
      // previewManager.isPremium = true
 
     SubscriptionView()
