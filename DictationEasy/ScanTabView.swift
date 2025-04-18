@@ -287,7 +287,7 @@ struct ScanTabView: View {
     private func alertMessageLimitedPhotoAccess() -> some View { Text("You have limited photo access...") }
     private func alertMessageCameraDenied() -> some View { Text("Please enable camera access...") }
     private func alertMessageCameraUnavailable() -> some View { Text("The camera is not available...") }
-    private func alertMessageUpgrade() -> some View { Text("Unlock unlimited past dictation storage...") }
+    private func alertMessageUpgrade() -> some View { Text("Unlock unlimited past dictation storageand more with a Premium subscription!\n通過高級訂閱解鎖無限過去文章存儲等功能！") }
     private func alertMessageDeleteEntry(entryData: DictationEntry) -> some View {
         Text("Are you sure you want to delete this entry dated \(entryData.date.formatted(date: .numeric, time: .omitted))?\n您確定要刪除此日期為 \(entryData.date.formatted(date: .numeric, time: .omitted)) 的條目嗎？")
     }
